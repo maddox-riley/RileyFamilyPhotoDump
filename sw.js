@@ -3,19 +3,20 @@
 // ============================================================
 
 const CACHE_NAME = 'riley-family-v2';
+const BASE = '/RileyFamilyPhotoDump';
 const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/app.js',
-  '/dump.js',
-  '/tracker.js',
-  '/ai.js',
-  '/flight.js',
-  '/music.js',
-  '/config.js',
-  '/manifest.json',
-  '/icons/icon.svg',
+  `${BASE}/`,
+  `${BASE}/index.html`,
+  `${BASE}/style.css`,
+  `${BASE}/app.js`,
+  `${BASE}/dump.js`,
+  `${BASE}/tracker.js`,
+  `${BASE}/ai.js`,
+  `${BASE}/flight.js`,
+  `${BASE}/music.js`,
+  `${BASE}/config.js`,
+  `${BASE}/manifest.json`,
+  `${BASE}/icons/icon.svg`,
 ];
 
 // Install: cache all static assets
@@ -61,7 +62,7 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Cache-first for music files and static assets
-  if (url.pathname.startsWith('/music/') || STATIC_ASSETS.includes(url.pathname)) {
+  if (url.pathname.startsWith(`${BASE}/music/`) || STATIC_ASSETS.includes(url.pathname)) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;

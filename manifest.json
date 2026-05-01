@@ -2,7 +2,7 @@
   "name": "Riley Family",
   "short_name": "Riley Family",
   "description": "Weekly family photo dumps and dad tracker for the Riley family.",
-  "start_url": "/",
+  "start_url": "/RileyFamilyPhotoDump/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#007AFF",
@@ -32,13 +32,13 @@
     {
       "name": "Photo Dump",
       "short_name": "Dump",
-      "url": "/?tab=dump",
+      "url": "/RileyFamilyPhotoDump/?tab=dump",
       "description": "Go to the weekly family photo dump"
     },
     {
       "name": "Dad Tracker",
       "short_name": "Dad",
-      "url": "/?tab=dad",
+      "url": "/RileyFamilyPhotoDump/?tab=dad",
       "description": "Track Dad's location and flights"
     }
   ]
