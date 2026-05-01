@@ -1,0 +1,45 @@
+{
+  "name": "Riley Family",
+  "short_name": "Riley Family",
+  "description": "Weekly family photo dumps and dad tracker for the Riley family.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#007AFF",
+  "orientation": "portrait-primary",
+  "lang": "en-US",
+  "categories": ["lifestyle", "social"],
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Photo Dump",
+      "short_name": "Dump",
+      "url": "/?tab=dump",
+      "description": "Go to the weekly family photo dump"
+    },
+    {
+      "name": "Dad Tracker",
+      "short_name": "Dad",
+      "url": "/?tab=dad",
+      "description": "Track Dad's location and flights"
+    }
+  ]
+}
