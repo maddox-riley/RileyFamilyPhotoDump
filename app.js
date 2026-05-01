@@ -91,16 +91,12 @@ window.App = (() => {
     const auth = document.getElementById('screen-auth');
     const main = document.getElementById('screen-main');
     auth.classList.remove('active');
-    // Block pointer events on main during transition to prevent click-through
-    main.style.pointerEvents = 'none';
     updateGreetingDate();
-    // Use rAF so the browser paints the auth removal first, then activates main
+    // rAF ensures auth fade-out paints before main fades in
     requestAnimationFrame(() => {
       main.classList.add('active');
-      setTimeout(() => {
-        main.style.pointerEvents = '';
-        if (window.Dump) Dump.enableReveal();
-      }, 600);
+      // Allow reveal after transition completes
+      setTimeout(() => { if (window.Dump) Dump.enableReveal(); }, 600);
     });
   }
 

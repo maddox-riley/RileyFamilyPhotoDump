@@ -149,15 +149,18 @@ img, video {
   display: flex;
   flex-direction: column;
   opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
+  visibility: hidden;
+  /* visibility goes hidden AFTER the fade-out completes (0.35s delay) */
+  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), visibility 0s linear 0.35s;
   transform: translateY(20px);
 }
 
 .screen.active {
   opacity: 1;
-  pointer-events: all;
+  visibility: visible;
   transform: translateY(0);
+  /* visibility becomes visible IMMEDIATELY when activating */
+  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), visibility 0s linear 0s;
 }
 
 /* ── Auth Screen ─────────────────────────────────────────── */
