@@ -23,6 +23,21 @@ const CONFIG = {
   AERODATABOX_HOST: 'aerodatabox.p.rapidapi.com',
 
   // ----------------------------------------------------------
+  // Firebase Realtime Database — cross-device sync (optional)
+  // Setup: https://console.firebase.google.com → New project → Realtime Database
+  // In Database Rules tab, set: { "rules": { ".read": true, ".write": true } }
+  // ----------------------------------------------------------
+  FIREBASE_CONFIG: {
+    apiKey:            'YOUR_FIREBASE_API_KEY',
+    authDomain:        'YOUR_PROJECT_ID.firebaseapp.com',
+    databaseURL:       'https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com',
+    projectId:         'YOUR_PROJECT_ID',
+    storageBucket:     'YOUR_PROJECT_ID.appspot.com',
+    messagingSenderId: 'YOUR_SENDER_ID',
+    appId:             'YOUR_APP_ID',
+  },
+
+  // ----------------------------------------------------------
   // Web Push (VAPID) — optional push notifications
   // Generate a key pair at: https://web-push-codelab.glitch.me/
   // Paste ONLY the public key here.
@@ -55,6 +70,9 @@ const CONFIG = {
     HOME_CITY: 'Charlotte',
     WORK_CITY: 'Dallas',
   },
+
+  // Base path for GitHub Pages deployment (used for audio file URLs)
+  BASE_PATH: '/RileyFamilyPhotoDump',
 
   // ----------------------------------------------------------
   // Storage limits

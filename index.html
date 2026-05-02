@@ -44,7 +44,7 @@
         <span class="member-name">Mom</span>
       </div>
       <div class="member-card" data-member="Maddox" role="button" aria-label="Select Maddox" onclick="App.setMember('Maddox')">
-        <span class="member-emoji">🧒</span>
+        <span class="member-emoji">👦</span>
         <span class="member-name">Maddox</span>
       </div>
       <div class="member-card" data-member="Dylan" role="button" aria-label="Select Dylan" onclick="App.setMember('Dylan')">
@@ -61,7 +61,7 @@
 
     <!-- Header -->
     <header id="app-header">
-      <span class="header-title">Riley Family</span>
+      <span class="header-title" id="app-title">Riley Family</span>
       <div class="header-user" id="header-user-btn" role="button" aria-label="Logged in as, tap to switch member">
         <div class="user-avatar" id="user-avatar-initials">?</div>
         <span id="header-user-name">Loading…</span>
@@ -339,6 +339,65 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════
+       DEVELOPER MODAL  (long-press "Riley Family" to open)
+  ════════════════════════════════════════════════════════ -->
+  <div id="dev-modal" class="hidden" role="dialog" aria-label="Developer">
+    <div class="settings-backdrop" id="dev-backdrop"></div>
+    <div class="settings-sheet" style="max-height:85vh;overflow-y:auto;">
+      <div class="settings-handle"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:0 4px 12px;">
+        <div class="settings-title" style="margin:0;">Developer</div>
+        <button id="dev-close-btn" style="background:none;border:none;font-size:20px;color:var(--text-secondary);cursor:pointer;padding:4px 8px;">✕</button>
+      </div>
+
+      <!-- Clear media -->
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:10px;">Media</div>
+        <button id="dev-clear-media-btn" class="full-btn" style="background:rgba(255,59,48,0.12);color:var(--red);border:1px solid rgba(255,59,48,0.25);">
+          🗑️ Clear This Week's Media (local)
+        </button>
+      </div>
+
+      <!-- Reveal schedule -->
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:12px;">Reveal Schedule</div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <label style="font-size:14px;color:var(--text-secondary);flex-shrink:0;">Reveal Day</label>
+            <select id="dev-reveal-day" style="flex:1;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:14px;">
+              <option value="0">Sunday</option>
+              <option value="1">Monday</option>
+              <option value="2">Tuesday</option>
+              <option value="3">Wednesday</option>
+              <option value="4">Thursday</option>
+              <option value="5">Friday</option>
+              <option value="6">Saturday</option>
+            </select>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+            <label style="font-size:14px;color:var(--text-secondary);flex-shrink:0;">Reveal Hour (0–23)</label>
+            <input type="number" id="dev-reveal-hour" min="0" max="23" value="12"
+              style="flex:1;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:14px;text-align:right;" />
+          </div>
+        </div>
+        <button id="dev-save-schedule-btn" class="full-btn primary" style="margin-top:14px;">
+          💾 Save &amp; Sync to All Devices
+        </button>
+      </div>
+
+      <!-- Testing -->
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:10px;">Testing</div>
+        <button id="dev-force-reveal-btn" class="full-btn" style="background:rgba(0,122,255,0.12);color:var(--blue);border:1px solid rgba(0,122,255,0.25);">
+          🎬 Force Reveal Now
+        </button>
+      </div>
+
+      <button class="full-btn secondary" id="dev-close-btn2" onclick="document.getElementById('dev-modal').classList.add('hidden')">Close</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
        SETTINGS MODAL
   ════════════════════════════════════════════════════════ -->
   <div id="settings-modal" class="hidden" role="dialog" aria-label="Settings">
@@ -355,6 +414,7 @@
 
 <!-- ─── Scripts (order matters) ─────────────────────────── -->
 <script src="config.js"></script>
+<script src="sync.js"></script>
 <script src="ai.js"></script>
 <script src="flight.js"></script>
 <script src="music.js"></script>

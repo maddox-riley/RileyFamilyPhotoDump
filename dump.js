@@ -103,20 +103,31 @@ window.Dump = (() => {
     const now = new Date();
     const day = now.getDay();
     const h   = now.getHours();
-    // Wed noon onwards, or Thu–Sun
-    return (day === 3 && h >= 12) || day === 4 || day === 5 || day === 6 || day === 0;
+    const rd  = CONFIG.APP.REVEAL_DAY;  // default 3 (Wed)
+    const rh  = CONFIG.APP.REVEAL_HOUR; // default 12
+    // Week order: Mon=1 … Sat=6, Sun=0
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    const dayPos = order.indexOf(day);
+    const rdPos  = order.indexOf(rd);
+    if (dayPos === rdPos) return h >= rh;
+    return dayPos > rdPos;
   }
 
   function getTimeUntilReveal() {
     const now = new Date();
     const day = now.getDay();
     const h   = now.getHours();
-    const nextWed = new Date(now);
-    let daysUntil = ((3 - day + 7) % 7);
-    if (daysUntil === 0 && h >= 12) daysUntil = 7;
-    nextWed.setDate(now.getDate() + daysUntil);
-    nextWed.setHours(12, 0, 0, 0);
-    return nextWed - now;
+    const rd  = CONFIG.APP.REVEAL_DAY;
+    const rh  = CONFIG.APP.REVEAL_HOUR;
+    const order = [1, 2, 3, 4, 5, 6, 0];
+    const dayPos = order.indexOf(day);
+    const rdPos  = order.indexOf(rd);
+    let daysUntil = (rdPos - dayPos + 7) % 7;
+    if (daysUntil === 0 && h >= rh) daysUntil = 7; // already passed today
+    const next = new Date(now);
+    next.setDate(now.getDate() + daysUntil);
+    next.setHours(rh, 0, 0, 0);
+    return next - now;
   }
 
   function formatTimeLeft(ms) {
@@ -319,7 +330,7 @@ window.Dump = (() => {
     const list    = document.getElementById('contributors-list');
     if (!list) return;
 
-    const memberEmojis = { Dad: '👨', Mom: '👩', Maddox: '🧒', Dylan: '👦' };
+    const memberEmojis = { Dad: '👨', Mom: '👩', Maddox: '👦', Dylan: '👧' };
     const colors = { Dad: '#007AFF', Mom: '#FF2D55', Maddox: '#34C759', Dylan: '#AF52DE' };
 
     list.innerHTML = CONFIG.APP.MEMBERS.map(member => {
@@ -351,7 +362,7 @@ window.Dump = (() => {
   function renderHomePills(grouped) {
     const pillsEl = document.getElementById('home-contrib-pills');
     if (!pillsEl) return;
-    const memberEmojis = { Dad: '👨', Mom: '👩', Maddox: '🧒', Dylan: '👦' };
+    const memberEmojis = { Dad: '👨', Mom: '👩', Maddox: '👦', Dylan: '👧' };
     pillsEl.innerHTML = CONFIG.APP.MEMBERS.map(m => {
       const has = (grouped[m] || []).length > 0;
       return `<span style="
@@ -569,7 +580,7 @@ window.Dump = (() => {
       const photos  = card.items.filter(m => m.type === 'photo');
       const videos  = card.items.filter(m => m.type === 'video');
       const voices  = card.items.filter(m => m.type === 'voice');
-      const emojis  = { Dad: '👨', Mom: '👩', Maddox: '🧒', Dylan: '👦' };
+      const emojis  = { Dad: '👨', Mom: '👩', Maddox: '👦', Dylan: '👧' };
 
       // Build media strip HTML
       let mediaHtml = '';
@@ -821,6 +832,38 @@ window.Dump = (() => {
     }
   }
 
+  // ── Developer utilities ───────────────────────────────────
+
+  async function clearWeekMedia() {
+    await openDB();
+    const weekKey = App.getWeekKey();
+    const items = await idbGetAllByIndex(STORE_MEDIA, 'weekKey', weekKey);
+    for (const item of items) {
+      await idbDelete(STORE_MEDIA, item.id);
+    }
+    await refreshDumpUI();
+    await refreshHomeStats();
+  }
+
+  function forceReveal() {
+    revealEnabledAt = 0;
+    startReveal();
+  }
+
+  function refreshScheduleUI() {
+    updateDumpHeader();
+    updateDumpSections();
+    startCountdown();
+    // Re-check home state
+    if (isRevealUnlocked()) {
+      document.getElementById('home-countdown-state')?.classList.add('hidden');
+      document.getElementById('home-reveal-state')?.classList.remove('hidden');
+    } else {
+      document.getElementById('home-countdown-state')?.classList.remove('hidden');
+      document.getElementById('home-reveal-state')?.classList.add('hidden');
+    }
+  }
+
   // ── Public API ────────────────────────────────────────────
   function enableReveal() { revealEnabledAt = 0; }
 
@@ -833,6 +876,9 @@ window.Dump = (() => {
     isRevealUnlocked,
     canUpload,
     getWeekDateRange,
+    clearWeekMedia,
+    forceReveal,
+    refreshScheduleUI,
   };
 
 })();

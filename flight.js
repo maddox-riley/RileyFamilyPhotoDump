@@ -15,9 +15,13 @@ window.Flight = (() => {
 
   // ── Storage ───────────────────────────────────────────────
   function saveFlightNumbers(monFlight, friFlight) {
-    const key = getFlightStorageKey();
-    const data = { monday: monFlight.trim().toUpperCase(), friday: friFlight.trim().toUpperCase() };
-    localStorage.setItem(key, JSON.stringify(data));
+    const data = {
+      monday: monFlight.trim().toUpperCase(),
+      friday: friFlight.trim().toUpperCase(),
+    };
+    localStorage.setItem(getFlightStorageKey(), JSON.stringify(data));
+    // Sync across devices
+    if (window.Sync) Sync.set('flights/' + App.getWeekKey(), data);
     return data;
   }
 
@@ -336,6 +340,20 @@ window.Flight = (() => {
     const friInput = document.getElementById('friday-flight-input');
     if (monInput && saved.monday) monInput.value = saved.monday;
     if (friInput && saved.friday) friInput.value = saved.friday;
+
+    // Subscribe to cross-device sync
+    if (window.Sync) {
+      Sync.subscribe('flights/' + App.getWeekKey(), (data) => {
+        if (!data) return;
+        // Update localStorage cache
+        localStorage.setItem(getFlightStorageKey(), JSON.stringify(data));
+        // Update inputs
+        if (monInput && data.monday) monInput.value = data.monday;
+        if (friInput && data.friday) friInput.value = data.friday;
+        // Refresh the family read-only view
+        if (window.Tracker) Tracker.applyDadMode();
+      });
+    }
 
     // Wire up buttons
     document.getElementById('track-monday-btn')?.addEventListener('click', () => {

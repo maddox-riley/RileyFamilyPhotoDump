@@ -26,10 +26,13 @@ window.Tracker = (() => {
     renderDadStatus(loc);
     renderHomeDadStatus(loc);
     if (navigator.vibrate) navigator.vibrate([10, 30, 10]);
+    // Sync across devices
+    if (window.Sync) Sync.set('location/override', loc);
   }
 
   function clearOverride() {
     localStorage.removeItem(LS_STATUS_OVERRIDE);
+    if (window.Sync) Sync.remove('location/override');
   }
 
   // ── Render dad status card (large) ───────────────────────
@@ -255,6 +258,20 @@ window.Tracker = (() => {
     renderScheduleStrip();
     syncNotifState();
     applyDadMode();
+
+    // Subscribe to cross-device location sync
+    if (window.Sync) {
+      Sync.subscribe('location/override', (syncedLoc) => {
+        if (syncedLoc) {
+          localStorage.setItem(LS_STATUS_OVERRIDE, syncedLoc);
+        } else {
+          localStorage.removeItem(LS_STATUS_OVERRIDE);
+        }
+        const current = getCurrentLocation();
+        renderDadStatus(current);
+        renderHomeDadStatus(current);
+      });
+    }
 
     // Wire toggle buttons (Dad only — HTML hides them for others)
     document.getElementById('btn-set-dallas')?.addEventListener('click', () => setLocation('dallas'));

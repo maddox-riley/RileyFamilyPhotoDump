@@ -12,9 +12,9 @@ window.Music = (() => {
   // ── Song list — update this when you add songs to /music ──
   const MUSIC_FILES = [
     // Add your mp4 filenames here, e.g.:
-     'Brand New Lyrics - Ben Rector.mp3',
-     'Great Night - Needtobreathe.mp3',
-     'Tame Impala - The Less I Know The Better (Audio).mp3',
+    // 'good-vibes.mp4',
+    // 'summer-memories.mp4',
+    // 'family-moments.mp4',
   ];
 
   // Fallback if no music files are defined
@@ -48,10 +48,20 @@ window.Music = (() => {
       audio.pause();
       audio.src = '';
     }
-    audio = new Audio(`/music/${song}`);
+    const base = (typeof CONFIG !== 'undefined' && CONFIG.BASE_PATH) ? CONFIG.BASE_PATH : '';
+    audio = new Audio(`${base}/music/${song}`);
     audio.loop = true;
     audio.volume = 0;
     audio.preload = 'auto';
+
+    // Start at a random point in the song (leave at least 30s to play)
+    audio.addEventListener('loadedmetadata', () => {
+      if (audio.duration && audio.duration > 60) {
+        const maxStart = audio.duration - 30;
+        audio.currentTime = Math.random() * maxStart;
+      }
+    }, { once: true });
+
     return audio;
   }
 

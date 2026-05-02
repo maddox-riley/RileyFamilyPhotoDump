@@ -179,10 +179,86 @@ window.App = (() => {
     }
   }
 
+  // ── Developer modal ───────────────────────────────────────
+  function openDevModal() {
+    const modal = document.getElementById('dev-modal');
+    if (!modal) return;
+    const revealDay  = document.getElementById('dev-reveal-day');
+    const revealHour = document.getElementById('dev-reveal-hour');
+    if (revealDay)  revealDay.value  = CONFIG.APP.REVEAL_DAY;
+    if (revealHour) revealHour.value = CONFIG.APP.REVEAL_HOUR;
+    modal.classList.remove('hidden');
+    if (navigator.vibrate) navigator.vibrate([10, 50, 10, 50, 10]);
+  }
+
+  function closeDevModal() {
+    document.getElementById('dev-modal')?.classList.add('hidden');
+  }
+
+  function wireDevModal() {
+    document.getElementById('dev-backdrop')?.addEventListener('click', closeDevModal);
+    document.getElementById('dev-close-btn')?.addEventListener('click', closeDevModal);
+
+    document.getElementById('dev-clear-media-btn')?.addEventListener('click', async () => {
+      if (!confirm('Clear all media for this week? This cannot be undone on this device.')) return;
+      await Dump.clearWeekMedia();
+      closeDevModal();
+      Tracker.showInAppAlert('Media cleared', "This week's media has been removed from this device.");
+    });
+
+    document.getElementById('dev-save-schedule-btn')?.addEventListener('click', async () => {
+      const day  = parseInt(document.getElementById('dev-reveal-day')?.value);
+      const hour = parseInt(document.getElementById('dev-reveal-hour')?.value);
+      if (isNaN(day) || isNaN(hour) || hour < 0 || hour > 23) return;
+      CONFIG.APP.REVEAL_DAY  = day;
+      CONFIG.APP.REVEAL_HOUR = hour;
+      await Sync.set('config/revealSchedule', { day, hour });
+      Dump.refreshScheduleUI();
+      closeDevModal();
+      const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][day];
+      Tracker.showInAppAlert('Schedule saved', `Reveal set to ${dayName} at ${hour}:00 — synced to all devices.`);
+    });
+
+    document.getElementById('dev-force-reveal-btn')?.addEventListener('click', () => {
+      closeDevModal();
+      Dump.forceReveal();
+    });
+  }
+
+  // ── Long-press on title → Developer modal ─────────────────
+  function wireLongPressTitle() {
+    const el = document.getElementById('app-title');
+    if (!el) return;
+    let timer = null;
+
+    const cancel = () => clearTimeout(timer);
+
+    el.addEventListener('touchstart', () => {
+      timer = setTimeout(openDevModal, 800);
+    }, { passive: true });
+    el.addEventListener('touchend',  cancel, { passive: true });
+    el.addEventListener('touchmove', cancel, { passive: true });
+
+    // Desktop support
+    el.addEventListener('mousedown', () => { timer = setTimeout(openDevModal, 800); });
+    el.addEventListener('mouseup',   cancel);
+    el.addEventListener('mouseleave', cancel);
+  }
+
   // ── Init ──────────────────────────────────────────────────
   async function init() {
     registerServiceWorker();
     listenForInstallPrompt();
+
+    // Init sync first so config overrides are available before modules init
+    await Sync.init();
+
+    // Load reveal schedule override from sync
+    const schedOverride = await Sync.get('config/revealSchedule');
+    if (schedOverride) {
+      if (typeof schedOverride.day  === 'number') CONFIG.APP.REVEAL_DAY  = schedOverride.day;
+      if (typeof schedOverride.hour === 'number') CONFIG.APP.REVEAL_HOUR = schedOverride.hour;
+    }
 
     // Auth check
     const saved = getSavedMember();
@@ -212,6 +288,10 @@ window.App = (() => {
 
     // Apply URL routing
     applyURLRouting();
+
+    // Wire developer modal and long press
+    wireDevModal();
+    wireLongPressTitle();
 
     // Init feature modules (order matters)
     await Dump.init();
