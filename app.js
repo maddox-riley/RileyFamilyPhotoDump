@@ -9,11 +9,20 @@ window.App = (() => {
   let currentMember   = null;
   let activeTab       = 'home';
 
-  // ── Week key (Monday date as YYYY-MM-DD) ──────────────────
+  // ── Week key (start date of current 7-day dump window) ───
   function getWeekKey() {
+    // Developer can set a custom week start date via the dev page (synced via Firebase)
+    const raw = localStorage.getItem('riley_sync_config__weekStart');
+    if (raw) {
+      try {
+        const val = JSON.parse(raw);
+        if (val && typeof val === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(val)) return val;
+      } catch {}
+    }
+    // Default: Monday of current week
     const now = new Date();
     const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1); // Monday
+    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
     const mon = new Date(now);
     mon.setDate(diff);
     mon.setHours(0, 0, 0, 0);
@@ -183,10 +192,8 @@ window.App = (() => {
   function openDevModal() {
     const modal = document.getElementById('dev-modal');
     if (!modal) return;
-    const revealDay  = document.getElementById('dev-reveal-day');
-    const revealHour = document.getElementById('dev-reveal-hour');
-    if (revealDay)  revealDay.value  = CONFIG.APP.REVEAL_DAY;
-    if (revealHour) revealHour.value = CONFIG.APP.REVEAL_HOUR;
+    const weekStartInput = document.getElementById('dev-week-start');
+    if (weekStartInput) weekStartInput.value = getWeekKey();
     modal.classList.remove('hidden');
     if (navigator.vibrate) navigator.vibrate([10, 50, 10, 50, 10]);
   }
@@ -207,16 +214,14 @@ window.App = (() => {
     });
 
     document.getElementById('dev-save-schedule-btn')?.addEventListener('click', async () => {
-      const day  = parseInt(document.getElementById('dev-reveal-day')?.value);
-      const hour = parseInt(document.getElementById('dev-reveal-hour')?.value);
-      if (isNaN(day) || isNaN(hour) || hour < 0 || hour > 23) return;
-      CONFIG.APP.REVEAL_DAY  = day;
-      CONFIG.APP.REVEAL_HOUR = hour;
-      await Sync.set('config/revealSchedule', { day, hour });
+      const weekStartVal = document.getElementById('dev-week-start')?.value;
+      if (!weekStartVal) return;
+      // Saving a new week start clears any force-reveal flag
+      await Sync.remove('config/revealForced');
+      await Sync.set('config/weekStart', weekStartVal);
       Dump.refreshScheduleUI();
       closeDevModal();
-      const dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][day];
-      Tracker.showInAppAlert('Schedule saved', `Reveal set to ${dayName} at ${hour}:00 — synced to all devices.`);
+      Tracker.showInAppAlert('Week updated', `Dump week starts ${weekStartVal} — synced to all devices.`);
     });
 
     document.getElementById('dev-force-reveal-btn')?.addEventListener('click', () => {
@@ -253,12 +258,18 @@ window.App = (() => {
     // Init sync first so config overrides are available before modules init
     await Sync.init();
 
-    // Load reveal schedule override from sync
-    const schedOverride = await Sync.get('config/revealSchedule');
-    if (schedOverride) {
-      if (typeof schedOverride.day  === 'number') CONFIG.APP.REVEAL_DAY  = schedOverride.day;
-      if (typeof schedOverride.hour === 'number') CONFIG.APP.REVEAL_HOUR = schedOverride.hour;
-    }
+    // Subscribe to week start changes (keeps all devices in sync)
+    Sync.subscribe('config/weekStart', (weekStart) => {
+      if (weekStart && typeof weekStart === 'string') {
+        localStorage.setItem('riley_sync_config__weekStart', JSON.stringify(weekStart));
+        if (window.Dump) Dump.refreshScheduleUI();
+      }
+    });
+
+    // Subscribe to force-reveal flag
+    Sync.subscribe('config/revealForced', (forced) => {
+      if (window.Dump) Dump.refreshScheduleUI();
+    });
 
     // Auth check
     const saved = getSavedMember();

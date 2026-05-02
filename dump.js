@@ -99,35 +99,22 @@ window.Dump = (() => {
     return day === 1 || day === 2 || (day === 3 && h < 12);
   }
 
+  function getRevealTime() {
+    // Reveal = weekStart date + 7 days (midnight)
+    const weekStart = App.getWeekKey(); // e.g. "2026-04-28"
+    const startMs = new Date(weekStart + 'T00:00:00').getTime();
+    return startMs + 7 * 24 * 60 * 60 * 1000;
+  }
+
   function isRevealUnlocked() {
-    const now = new Date();
-    const day = now.getDay();
-    const h   = now.getHours();
-    const rd  = CONFIG.APP.REVEAL_DAY;  // default 3 (Wed)
-    const rh  = CONFIG.APP.REVEAL_HOUR; // default 12
-    // Week order: Mon=1 … Sat=6, Sun=0
-    const order = [1, 2, 3, 4, 5, 6, 0];
-    const dayPos = order.indexOf(day);
-    const rdPos  = order.indexOf(rd);
-    if (dayPos === rdPos) return h >= rh;
-    return dayPos > rdPos;
+    // Check if dev force-unlocked for all devices via Sync
+    const forced = localStorage.getItem('riley_sync_config__revealForced');
+    if (forced) { try { if (JSON.parse(forced) === true) return true; } catch {} }
+    return Date.now() >= getRevealTime();
   }
 
   function getTimeUntilReveal() {
-    const now = new Date();
-    const day = now.getDay();
-    const h   = now.getHours();
-    const rd  = CONFIG.APP.REVEAL_DAY;
-    const rh  = CONFIG.APP.REVEAL_HOUR;
-    const order = [1, 2, 3, 4, 5, 6, 0];
-    const dayPos = order.indexOf(day);
-    const rdPos  = order.indexOf(rd);
-    let daysUntil = (rdPos - dayPos + 7) % 7;
-    if (daysUntil === 0 && h >= rh) daysUntil = 7; // already passed today
-    const next = new Date(now);
-    next.setDate(now.getDate() + daysUntil);
-    next.setHours(rh, 0, 0, 0);
-    return next - now;
+    return Math.max(0, getRevealTime() - Date.now());
   }
 
   function formatTimeLeft(ms) {
@@ -141,15 +128,12 @@ window.Dump = (() => {
   }
 
   function getWeekDateRange() {
-    const now = new Date();
-    const day = now.getDay();
-    const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-    const mon = new Date(now);
-    mon.setDate(diff); mon.setHours(0,0,0,0);
-    const sun = new Date(mon);
-    sun.setDate(mon.getDate() + 6);
+    const weekStart = App.getWeekKey(); // ISO date e.g. "2026-04-28"
+    const start = new Date(weekStart + 'T00:00:00');
+    const end   = new Date(start);
+    end.setDate(start.getDate() + 6);
     const opts = { month: 'short', day: 'numeric' };
-    return `${mon.toLocaleDateString('en-US', opts)} – ${sun.toLocaleDateString('en-US', opts)}`;
+    return `${start.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}`;
   }
 
   // ── Save media to IndexedDB ───────────────────────────────
@@ -847,6 +831,9 @@ window.Dump = (() => {
 
   function forceReveal() {
     revealEnabledAt = 0;
+    // Sync the force flag so all devices show the reveal button
+    if (window.Sync) Sync.set('config/revealForced', true);
+    updateDumpSections();
     startReveal();
   }
 

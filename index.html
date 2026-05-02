@@ -108,7 +108,7 @@
             <div id="home-countdown-state">
               <div class="dump-mini-countdown">
                 <div class="countdown-display" id="home-countdown-timer">--:--:--</div>
-                <div class="countdown-label">until the Wednesday reveal</div>
+                <div class="countdown-label">until the reveal</div>
               </div>
               <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
                 <div id="home-contrib-pills" style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center;"></div>
@@ -358,27 +358,16 @@
         </button>
       </div>
 
-      <!-- Reveal schedule -->
+      <!-- Week start date -->
       <div class="card" style="margin-bottom:14px;">
-        <div class="card-title" style="margin-bottom:12px;">Reveal Schedule</div>
-        <div style="display:flex;flex-direction:column;gap:12px;">
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-            <label style="font-size:14px;color:var(--text-secondary);flex-shrink:0;">Reveal Day</label>
-            <select id="dev-reveal-day" style="flex:1;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:14px;">
-              <option value="0">Sunday</option>
-              <option value="1">Monday</option>
-              <option value="2">Tuesday</option>
-              <option value="3">Wednesday</option>
-              <option value="4">Thursday</option>
-              <option value="5">Friday</option>
-              <option value="6">Saturday</option>
-            </select>
-          </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
-            <label style="font-size:14px;color:var(--text-secondary);flex-shrink:0;">Reveal Hour (0–23)</label>
-            <input type="number" id="dev-reveal-hour" min="0" max="23" value="12"
-              style="flex:1;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:14px;text-align:right;" />
-          </div>
+        <div class="card-title" style="margin-bottom:4px;">Dump Week</div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
+          The 7-day window starts on this date. The reveal unlocks exactly 7 days later.
+        </p>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <label style="font-size:14px;color:var(--text-secondary);flex-shrink:0;">Week starts on</label>
+          <input type="date" id="dev-week-start"
+            style="flex:1;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:14px;" />
         </div>
         <button id="dev-save-schedule-btn" class="full-btn primary" style="margin-top:14px;">
           💾 Save &amp; Sync to All Devices
