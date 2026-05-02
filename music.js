@@ -24,6 +24,7 @@ window.Music = (() => {
   let isMuted = false;
   let currentSong = null;
   let fadeInterval = null;
+  let stopped = false; // guards against autoplay race condition
 
   // ── Song selection — one per week, persisted ──────────────
 
@@ -111,6 +112,7 @@ window.Music = (() => {
   // ── Public: start music for reveal ───────────────────────
 
   async function startReveal(weekKey) {
+    stopped = false;
     currentSong = getSongForWeek(weekKey);
     if (!currentSong) return null; // No music configured
 
@@ -118,17 +120,16 @@ window.Music = (() => {
 
     try {
       await audio.play();
-      fadeIn(1, 1000);
+      if (!stopped) fadeIn(1, 1000);
     } catch (e) {
-      // Autoplay blocked — that's ok, user will interact with screen
+      // Autoplay blocked — try on the next user gesture
       console.warn('Autoplay blocked:', e);
-      // Try on next user gesture
       const tryPlay = async () => {
+        if (stopped) return; // reveal was closed before first tap
         try {
           await audio.play();
-          fadeIn(1, 1000);
+          if (!stopped) fadeIn(1, 1000);
         } catch {}
-        document.removeEventListener('click', tryPlay, { once: true });
       };
       document.addEventListener('click', tryPlay, { once: true });
     }
@@ -137,8 +138,10 @@ window.Music = (() => {
   }
 
   async function stopReveal() {
+    stopped = true;
     await fadeOut(800);
     if (audio) {
+      audio.pause();
       audio.src = '';
       audio = null;
     }

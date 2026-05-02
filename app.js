@@ -40,8 +40,9 @@ window.App = (() => {
     if (document.getElementById('screen-auth').classList.contains('active')) {
       showMainApp();
     }
-    // Re-apply member-specific UI (Dad controls, etc.)
+    // Re-apply member-specific UI (Dad controls, uploads, etc.)
     if (window.Tracker) Tracker.applyDadMode();
+    if (window.Dump) Dump.refreshDumpUI();
     if (navigator.vibrate) navigator.vibrate([10, 40, 10]);
   }
 

@@ -118,13 +118,14 @@ window.Dump = (() => {
   }
 
   function formatTimeLeft(ms) {
-    if (ms <= 0) return '00:00:00';
-    const s  = Math.floor(ms / 1000);
-    const m  = Math.floor(s / 60);
-    const hh = Math.floor(m / 60);
-    const mm = m % 60;
-    const ss = s % 60;
-    return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    if (ms <= 0) return '0d 00:00:00';
+    const totalSec = Math.floor(ms / 1000);
+    const d  = Math.floor(totalSec / 86400);
+    const hh = Math.floor((totalSec % 86400) / 3600);
+    const mm = Math.floor((totalSec % 3600) / 60);
+    const ss = totalSec % 60;
+    const time = `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}:${String(ss).padStart(2,'0')}`;
+    return `${d}d ${time}`;
   }
 
   function getWeekDateRange() {
