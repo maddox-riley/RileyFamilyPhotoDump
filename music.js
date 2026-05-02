@@ -12,9 +12,9 @@ window.Music = (() => {
   // ── Song list — update this when you add songs to /music ──
   const MUSIC_FILES = [
     // Add your mp4 filenames here, e.g.:
-    // 'good-vibes.mp4',
-    // 'summer-memories.mp4',
-    // 'family-moments.mp4',
+     'Brand New Lyrics - Ben Rector.mp3',
+     'Great Night - Needtobreathe.mp3',
+     'Tame Impala - The Less I Know The Better (Audio).mp3',
   ];
 
   // Fallback if no music files are defined

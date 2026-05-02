@@ -208,6 +208,45 @@ window.Tracker = (() => {
     if (Notification.permission === 'denied')  updateNotifBadge('Denied');
   }
 
+  // ── Show/hide Dad-only controls ───────────────────────────
+  function applyDadMode() {
+    const isDad = App.getCurrentMember() === 'Dad';
+    const toggle = document.getElementById('dad-status-toggle');
+    const inputs = document.getElementById('dad-flight-inputs');
+    const familyView = document.getElementById('dad-flight-family-view');
+
+    if (toggle) toggle.style.display = isDad ? 'flex' : 'none';
+    if (inputs) inputs.style.display  = isDad ? 'flex' : 'none';
+
+    // Family view: show saved flight numbers when not Dad
+    if (familyView) {
+      if (!isDad) {
+        const saved = Flight.loadFlightNumbers();
+        const hasMon = !!saved.monday;
+        const hasFri = !!saved.friday;
+        if (hasMon || hasFri) {
+          familyView.innerHTML = `
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              ${hasMon ? `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface-2);border-radius:var(--r-sm);">
+                <span style="font-size:20px;">✈️</span>
+                <div><div style="font-size:13px;color:var(--text-secondary);">Monday departure</div><div style="font-weight:700;">${saved.monday}</div></div>
+              </div>` : ''}
+              ${hasFri ? `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface-2);border-radius:var(--r-sm);">
+                <span style="font-size:20px;">🏠</span>
+                <div><div style="font-size:13px;color:var(--text-secondary);">Friday return</div><div style="font-weight:700;">${saved.friday}</div></div>
+              </div>` : ''}
+            </div>`;
+        } else {
+          familyView.innerHTML = `<div style="font-size:14px;color:var(--text-secondary);text-align:center;padding:12px 0;">
+            Dad hasn't entered his flights yet this week.
+          </div>`;
+        }
+      } else {
+        familyView.innerHTML = '';
+      }
+    }
+  }
+
   // ── Init ──────────────────────────────────────────────────
   function init() {
     const loc = getCurrentLocation();
@@ -215,8 +254,9 @@ window.Tracker = (() => {
     renderHomeDadStatus(loc);
     renderScheduleStrip();
     syncNotifState();
+    applyDadMode();
 
-    // Wire toggle buttons
+    // Wire toggle buttons (Dad only — HTML hides them for others)
     document.getElementById('btn-set-dallas')?.addEventListener('click', () => setLocation('dallas'));
     document.getElementById('btn-set-charlotte')?.addEventListener('click', () => setLocation('charlotte'));
 
@@ -248,6 +288,7 @@ window.Tracker = (() => {
     clearOverride,
     showInAppAlert,
     getAutoLocation,
+    applyDadMode,
   };
 
 })();

@@ -381,30 +381,23 @@ window.Dump = (() => {
     if (dateRange) dateRange.textContent = getWeekDateRange();
 
     if (statusTxt) {
-      if (canUpload()) statusTxt.textContent = 'Upload window open • Closes Wednesday noon';
-      else if (isRevealUnlocked()) statusTxt.textContent = 'Reveal unlocked! New uploads open Monday.';
-      else statusTxt.textContent = 'Upload window closed until Monday';
+      if (isRevealUnlocked()) statusTxt.textContent = 'Reveal ready • Keep uploading for next week!';
+      else statusTxt.textContent = `Uploading for Week ${weekNum} • Reveal Wednesday noon`;
     }
   }
 
   function updateDumpSections() {
-    const uploadSec  = document.getElementById('dump-upload-section');
-    const revealSec  = document.getElementById('dump-reveal-section');
-    const lockedSec  = document.getElementById('dump-locked-section');
+    const uploadSec = document.getElementById('dump-upload-section');
+    const revealSec = document.getElementById('dump-reveal-section');
 
-    if (canUpload()) {
-      uploadSec?.classList.remove('hidden');
-      revealSec?.classList.add('hidden');
-      lockedSec?.classList.add('hidden');
-    } else if (isRevealUnlocked()) {
-      uploadSec?.classList.add('hidden');
+    // Always show uploads
+    uploadSec?.classList.remove('hidden');
+
+    // Show reveal button only after Wednesday noon
+    if (isRevealUnlocked()) {
       revealSec?.classList.remove('hidden');
-      lockedSec?.classList.remove('hidden');
     } else {
-      // Between Sunday and Monday (edge case)
-      uploadSec?.classList.add('hidden');
       revealSec?.classList.add('hidden');
-      lockedSec?.classList.remove('hidden');
     }
   }
 
@@ -424,10 +417,10 @@ window.Dump = (() => {
 
     function tick() {
       if (isRevealUnlocked()) {
-        // Switch home card to reveal state
         document.getElementById('home-countdown-state')?.classList.add('hidden');
         document.getElementById('home-reveal-state')?.classList.remove('hidden');
         clearInterval(countdownInterval);
+        updateDumpSections();
         return;
       }
       el.textContent = formatTimeLeft(getTimeUntilReveal());

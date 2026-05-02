@@ -31,6 +31,8 @@ window.App = (() => {
     if (document.getElementById('screen-auth').classList.contains('active')) {
       showMainApp();
     }
+    // Re-apply member-specific UI (Dad controls, etc.)
+    if (window.Tracker) Tracker.applyDadMode();
     if (navigator.vibrate) navigator.vibrate([10, 40, 10]);
   }
 

@@ -48,7 +48,7 @@
         <span class="member-name">Maddox</span>
       </div>
       <div class="member-card" data-member="Dylan" role="button" aria-label="Select Dylan" onclick="App.setMember('Dylan')">
-        <span class="member-emoji">👦</span>
+        <span class="member-emoji">👧</span>
         <span class="member-name">Dylan</span>
       </div>
     </div>
@@ -218,15 +218,6 @@
             </p>
           </div>
 
-          <!-- Locked state (Thu–Sun after reveal, before next Monday) -->
-          <div id="dump-locked-section" class="hidden card" style="text-align:center;padding:28px 20px;">
-            <div style="font-size:48px;margin-bottom:12px;">🔒</div>
-            <h3 style="font-size:18px;font-weight:700;">Upload window closed</h3>
-            <p style="font-size:14px;color:var(--text-secondary);margin-top:6px;">
-              New uploads open Monday morning.<br/>You can still replay this week's reveal!
-            </p>
-          </div>
-
         </div>
       </div>
 
@@ -234,19 +225,20 @@
       <div id="tab-dad" class="tab-panel">
         <div class="tab-panel-content">
 
-          <!-- Dad Status Card (large) -->
+          <!-- Dad Status Card (large) — always visible -->
           <div class="dad-status-card dallas" id="dad-status-card">
             <div class="status-bg-icon" id="dad-status-bg-icon">✈️</div>
             <div class="status-label">Dad is currently</div>
             <h2 id="dad-status-headline">In Dallas ✈️</h2>
             <div class="status-subtitle" id="dad-status-sub">Leaves Charlotte Monday morning</div>
-            <div class="status-toggle">
+            <!-- Toggle buttons only shown to Dad -->
+            <div class="status-toggle" id="dad-status-toggle" style="display:none;">
               <button class="status-toggle-btn" id="btn-set-dallas">In Dallas ✈️</button>
               <button class="status-toggle-btn" id="btn-set-charlotte">In Charlotte 🏠</button>
             </div>
           </div>
 
-          <!-- Weekly Schedule Strip -->
+          <!-- Weekly Schedule Strip — always visible -->
           <div class="card">
             <div class="card-title">Weekly Schedule</div>
             <div class="schedule-strip" id="schedule-strip"></div>
@@ -262,38 +254,35 @@
             </div>
           </div>
 
-          <!-- Flight Tracker -->
+          <!-- Flight status — always visible (read-only for family, editable for Dad) -->
           <div class="card">
             <div class="card-header">
-              <h3>Flight Tracker</h3>
+              <h3>This Week's Flights</h3>
               <span id="flight-refresh-indicator" style="font-size:11px;color:var(--text-secondary);"></span>
             </div>
-
-            <div style="display:flex;flex-direction:column;gap:14px;">
-              <div>
-                <div class="flight-input-row">
-                  <div class="flight-input-wrap">
-                    <label for="monday-flight-input">Monday Departure</label>
-                    <input type="text" id="monday-flight-input" placeholder="e.g. WN1234" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-                  </div>
-                  <button class="track-btn" id="track-monday-btn">Track</button>
+            <!-- Dad-only: input fields -->
+            <div id="dad-flight-inputs" style="display:none;flex-direction:column;gap:14px;margin-bottom:16px;">
+              <div class="flight-input-row">
+                <div class="flight-input-wrap">
+                  <label for="monday-flight-input">Monday Departure</label>
+                  <input type="text" id="monday-flight-input" placeholder="e.g. WN1234" autocomplete="off" autocapitalize="characters" spellcheck="false" />
                 </div>
+                <button class="track-btn" id="track-monday-btn">Save</button>
               </div>
-              <div>
-                <div class="flight-input-row">
-                  <div class="flight-input-wrap">
-                    <label for="friday-flight-input">Friday Return</label>
-                    <input type="text" id="friday-flight-input" placeholder="e.g. WN5678" autocomplete="off" autocapitalize="characters" spellcheck="false" />
-                  </div>
-                  <button class="track-btn" id="track-friday-btn">Track</button>
+              <div class="flight-input-row">
+                <div class="flight-input-wrap">
+                  <label for="friday-flight-input">Friday Return</label>
+                  <input type="text" id="friday-flight-input" placeholder="e.g. WN5678" autocomplete="off" autocapitalize="characters" spellcheck="false" />
                 </div>
+                <button class="track-btn" id="track-friday-btn">Save</button>
               </div>
             </div>
-
-            <div id="flight-status-area" style="margin-top:16px;"></div>
+            <!-- Family view: shows saved flights or a friendly message -->
+            <div id="dad-flight-family-view"></div>
+            <div id="flight-status-area" style="margin-top:8px;"></div>
           </div>
 
-          <!-- Push Notifications Card -->
+          <!-- Push Notifications — always visible -->
           <div class="card" id="notifications-card">
             <div class="card-header">
               <h3>Notifications</h3>
