@@ -2,7 +2,7 @@
 // Riley Family — Service Worker
 // ============================================================
 
-const CACHE_NAME = 'riley-family-v3';
+const CACHE_NAME = 'riley-family-v4';
 const BASE = '/RileyFamilyPhotoDump';
 const STATIC_ASSETS = [
   `${BASE}/`,
@@ -63,7 +63,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for music files and static assets
+  // config.js is always network-first so credential updates are picked up immediately
+  if (url.pathname === `${BASE}/config.js`) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // Cache-first for music files and other static assets
   if (url.pathname.startsWith(`${BASE}/music/`) || STATIC_ASSETS.includes(url.pathname)) {
     event.respondWith(
       caches.match(request).then((cached) => {
