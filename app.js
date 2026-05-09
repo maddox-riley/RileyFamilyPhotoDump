@@ -230,64 +230,29 @@ window.App = (() => {
       Dump.forceReveal();
     });
 
-    // ── API key save ──────────────────────────────────────────
-    // Pre-fill inputs with whatever is already saved on this device
-    const openaiInput    = document.getElementById('dev-key-openai');
-    const rapidapiInput  = document.getElementById('dev-key-rapidapi');
-    const firebaseInput  = document.getElementById('dev-key-firebase');
-    const cloudinaryInput= document.getElementById('dev-key-cloudinary');
-
-    if (openaiInput)     openaiInput.value     = localStorage.getItem('riley_key_openai') || '';
-    if (rapidapiInput)   rapidapiInput.value   = localStorage.getItem('riley_key_rapidapi') || '';
-    if (firebaseInput)   firebaseInput.value   = localStorage.getItem('riley_key_firebase') || '';
-    if (cloudinaryInput) cloudinaryInput.value = localStorage.getItem('riley_key_cloudinary') || '';
-
-    document.getElementById('dev-save-keys-btn')?.addEventListener('click', async () => {
-      const openai     = openaiInput?.value.trim();
-      const rapidapi   = rapidapiInput?.value.trim();
-      const firebaseStr  = firebaseInput?.value.trim();
-      const cloudinaryStr= cloudinaryInput?.value.trim();
-
-      if (openai)   localStorage.setItem('riley_key_openai',   openai);
-      if (rapidapi) localStorage.setItem('riley_key_rapidapi', rapidapi);
-
-      let firebaseParsed   = null;
-      let cloudinaryParsed = null;
-
-      if (firebaseStr) {
-        try { firebaseParsed = JSON.parse(firebaseStr); localStorage.setItem('riley_key_firebase', firebaseStr); }
-        catch { alert('Firebase config is not valid JSON — check the format and try again.'); return; }
+    // ── Share setup link ──────────────────────────────────────
+    document.getElementById('dev-share-setup-btn')?.addEventListener('click', async () => {
+      const link = Setup.generateLink();
+      if (navigator.share) {
+        try {
+          await navigator.share({ title: 'Riley Family — Device Setup', url: link });
+          return;
+        } catch {}
       }
-      if (cloudinaryStr) {
-        try { cloudinaryParsed = JSON.parse(cloudinaryStr); localStorage.setItem('riley_key_cloudinary', cloudinaryStr); }
-        catch { alert('Cloudinary config is not valid JSON — check the format and try again.'); return; }
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(link);
+        Tracker.showInAppAlert('Link copied!', 'Paste it in iMessage and send to the family.');
+      } catch {
+        prompt('Copy this setup link and send via iMessage:', link);
       }
-
-      // Update CONFIG in memory immediately — no reload needed
-      if (openai)           CONFIG.OPENAI_API_KEY      = openai;
-      if (rapidapi)         CONFIG.RAPIDAPI_KEY         = rapidapi;
-      if (firebaseParsed)   CONFIG.FIREBASE_CONFIG      = firebaseParsed;
-      if (cloudinaryParsed) CONFIG.CLOUDINARY_CONFIG    = cloudinaryParsed;
-
-      // Force Sync to reconnect with the new Firebase config
-      if (firebaseParsed && window.Sync) {
-        await Sync.init(true);
-        // Re-subscribe to live channels now that Firebase is connected
-        Sync.subscribe('config/weekStart', (weekStart) => {
-          if (weekStart && typeof weekStart === 'string') {
-            localStorage.setItem('riley_sync_config__weekStart', JSON.stringify(weekStart));
-            if (window.Dump) Dump.refreshScheduleUI();
-          }
-        });
-        Sync.subscribe('config/revealForced', () => {
-          if (window.Dump) Dump.refreshScheduleUI();
-        });
-        if (window.Flight) Flight.init();
-        if (window.Dump)   Dump.init();
-      }
-
       closeDevModal();
-      Tracker.showInAppAlert('Keys saved', 'All keys are active on this device.');
+    });
+
+    // ── Open setup screen from dev modal ─────────────────────
+    document.getElementById('dev-open-setup-btn')?.addEventListener('click', () => {
+      closeDevModal();
+      Setup.openSetupScreen();
     });
   }
 
@@ -331,6 +296,10 @@ window.App = (() => {
     Sync.subscribe('config/revealForced', (forced) => {
       if (window.Dump) Dump.refreshScheduleUI();
     });
+
+    // First-run setup check — shows setup screen if not yet configured
+    const setupShown = Setup.init();
+    if (setupShown) return; // setup screen handles its own flow
 
     // Auth check
     const saved = getSavedMember();

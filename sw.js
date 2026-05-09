@@ -16,6 +16,7 @@ const STATIC_ASSETS = [
   `${BASE}/music.js`,
   `${BASE}/config.js`,
   `${BASE}/sync.js`,
+  `${BASE}/setup.js`,
   `${BASE}/manifest.json`,
   `${BASE}/icons/icon.svg`,
 ];

@@ -25,6 +25,68 @@
 <div id="app">
 
   <!-- ═══════════════════════════════════════════════════════
+       SETUP SCREEN  (first run on each device)
+  ════════════════════════════════════════════════════════ -->
+  <div id="screen-setup" class="screen">
+    <div class="setup-wrap">
+
+      <div class="setup-header">
+        <div class="app-icon">🏠</div>
+        <h1>Riley Family</h1>
+        <p>Set up this device to sync with everyone.</p>
+      </div>
+
+      <!-- Banner shown when a setup link was detected -->
+      <div id="setup-link-banner" class="setup-banner hidden">
+        ✅ Config received! Review below and tap <strong>Save & Continue</strong>.
+      </div>
+
+      <!-- ── Firebase ───────────────────────────────────── -->
+      <div class="setup-section">
+        <div class="setup-section-title">🔄 Sync (Firebase)</div>
+        <p class="setup-section-desc">
+          Go to <strong>console.firebase.google.com</strong> → your project → Project Settings → scroll to "Your apps" → copy the <code>firebaseConfig</code> object and paste it below.
+        </p>
+        <label class="setup-label">Firebase Config</label>
+        <textarea id="setup-firebase" class="setup-textarea" rows="5"
+          placeholder='Paste the firebaseConfig JSON here, e.g.&#10;{&#10;  "apiKey": "AIza...",&#10;  "databaseURL": "https://...",&#10;  ...&#10;}'></textarea>
+      </div>
+
+      <!-- ── Cloudinary ─────────────────────────────────── -->
+      <div class="setup-section">
+        <div class="setup-section-title">📸 Photo &amp; Video Sync (Cloudinary)</div>
+        <p class="setup-section-desc">
+          From your <strong>cloudinary.com</strong> dashboard. Cloud Name is on the home page. Upload Preset is under Settings → Upload (must be set to Unsigned).
+        </p>
+        <label class="setup-label">Cloud Name</label>
+        <input type="text" id="setup-cloudname" class="setup-input" placeholder="e.g. riley-family" autocomplete="off" />
+        <label class="setup-label" style="margin-top:10px;">Upload Preset</label>
+        <input type="text" id="setup-preset" class="setup-input" placeholder="e.g. riley_unsigned" autocomplete="off" />
+      </div>
+
+      <!-- ── OpenAI ─────────────────────────────────────── -->
+      <div class="setup-section">
+        <div class="setup-section-title">🤖 AI Summaries (Optional)</div>
+        <p class="setup-section-desc">
+          Only needed on <strong>one device</strong> (Dad's). Summaries are generated once and shared with everyone automatically. Get your key at <strong>platform.openai.com/api-keys</strong>.
+        </p>
+        <label class="setup-label">OpenAI API Key</label>
+        <input type="password" id="setup-openai" class="setup-input" placeholder="sk-proj-…" autocomplete="off" />
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
+        <button id="setup-save-btn" class="full-btn primary" style="font-size:16px;padding:16px;">
+          Save &amp; Continue →
+        </button>
+        <button id="setup-skip-btn" class="full-btn secondary">
+          Skip for now
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
        AUTH SCREEN
   ════════════════════════════════════════════════════════ -->
   <div id="screen-auth" class="screen active">
@@ -374,36 +436,17 @@
         </button>
       </div>
 
-      <!-- API Keys -->
+      <!-- Share setup link -->
       <div class="card" style="margin-bottom:14px;">
-        <div class="card-title" style="margin-bottom:4px;">API Keys</div>
+        <div class="card-title" style="margin-bottom:4px;">Share Setup</div>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
-          Keys are saved on this device only — never stored in the app code.
+          Generate a link that pre-fills the setup screen on other devices. Send it via iMessage — they just tap it and hit Save.
         </p>
-        <div style="display:flex;flex-direction:column;gap:10px;">
-          <div>
-            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">OpenAI API Key</label>
-            <input type="password" id="dev-key-openai" placeholder="sk-proj-…"
-              style="width:100%;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:13px;box-sizing:border-box;" />
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">RapidAPI Key (flight tracking)</label>
-            <input type="password" id="dev-key-rapidapi" placeholder="your-rapidapi-key"
-              style="width:100%;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:13px;box-sizing:border-box;" />
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">Firebase Config (JSON)</label>
-            <textarea id="dev-key-firebase" rows="3" placeholder='{"apiKey":"…","databaseURL":"…"}'
-              style="width:100%;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:12px;font-family:monospace;box-sizing:border-box;resize:vertical;"></textarea>
-          </div>
-          <div>
-            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">Cloudinary Config (JSON)</label>
-            <textarea id="dev-key-cloudinary" rows="2" placeholder='{"cloudName":"…","uploadPreset":"…"}'
-              style="width:100%;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:12px;font-family:monospace;box-sizing:border-box;resize:vertical;"></textarea>
-          </div>
-        </div>
-        <button id="dev-save-keys-btn" class="full-btn primary" style="margin-top:14px;">
-          🔑 Save Keys to This Device
+        <button id="dev-share-setup-btn" class="full-btn" style="background:rgba(52,199,89,0.12);color:var(--green);border:1px solid rgba(52,199,89,0.3);">
+          🔗 Share Setup Link
+        </button>
+        <button id="dev-open-setup-btn" class="full-btn secondary" style="margin-top:10px;">
+          ⚙️ Edit My Setup
         </button>
       </div>
 
@@ -437,6 +480,7 @@
 <!-- ─── Scripts (order matters) ─────────────────────────── -->
 <script src="config.js"></script>
 <script src="sync.js"></script>
+<script src="setup.js"></script>
 <script src="ai.js"></script>
 <script src="flight.js"></script>
 <script src="music.js"></script>
