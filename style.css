@@ -1571,9 +1571,13 @@ img, video {
 }
 
 /* ── Setup Screen ───────────────────────────────────────── */
+/* position:fixed escapes #app's overflow:hidden so the page can scroll */
 #screen-setup {
+  position: fixed !important;
+  inset: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  z-index: 50;
 }
 
 .setup-wrap {
