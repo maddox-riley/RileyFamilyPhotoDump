@@ -229,6 +229,43 @@ window.App = (() => {
       closeDevModal();
       Dump.forceReveal();
     });
+
+    // ── API key save ──────────────────────────────────────────
+    // Pre-fill inputs with whatever is already saved on this device
+    const openaiInput    = document.getElementById('dev-key-openai');
+    const rapidapiInput  = document.getElementById('dev-key-rapidapi');
+    const firebaseInput  = document.getElementById('dev-key-firebase');
+    const cloudinaryInput= document.getElementById('dev-key-cloudinary');
+
+    if (openaiInput)     openaiInput.value     = localStorage.getItem('riley_key_openai') || '';
+    if (rapidapiInput)   rapidapiInput.value   = localStorage.getItem('riley_key_rapidapi') || '';
+    if (firebaseInput)   firebaseInput.value   = localStorage.getItem('riley_key_firebase') || '';
+    if (cloudinaryInput) cloudinaryInput.value = localStorage.getItem('riley_key_cloudinary') || '';
+
+    document.getElementById('dev-save-keys-btn')?.addEventListener('click', async () => {
+      const openai    = openaiInput?.value.trim();
+      const rapidapi  = rapidapiInput?.value.trim();
+      const firebase  = firebaseInput?.value.trim();
+      const cloudinary= cloudinaryInput?.value.trim();
+
+      if (openai)    localStorage.setItem('riley_key_openai',    openai);
+      if (rapidapi)  localStorage.setItem('riley_key_rapidapi',  rapidapi);
+
+      if (firebase) {
+        try { JSON.parse(firebase); localStorage.setItem('riley_key_firebase', firebase); }
+        catch { alert('Firebase config is not valid JSON — check the format and try again.'); return; }
+      }
+      if (cloudinary) {
+        try { JSON.parse(cloudinary); localStorage.setItem('riley_key_cloudinary', cloudinary); }
+        catch { alert('Cloudinary config is not valid JSON — check the format and try again.'); return; }
+      }
+
+      // Re-init Sync so Firebase picks up the new config immediately
+      if (firebase && window.Sync) await Sync.init();
+
+      closeDevModal();
+      Tracker.showInAppAlert('Keys saved', 'API keys saved to this device. Reload the app to apply all changes.');
+    });
   }
 
   // ── Long-press on title → Developer modal ─────────────────

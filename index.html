@@ -374,6 +374,39 @@
         </button>
       </div>
 
+      <!-- API Keys -->
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-title" style="margin-bottom:4px;">API Keys</div>
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
+          Keys are saved on this device only — never stored in the app code.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div>
+            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">OpenAI API Key</label>
+            <input type="password" id="dev-key-openai" placeholder="sk-proj-…"
+              style="width:100%;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:13px;box-sizing:border-box;" />
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">RapidAPI Key (flight tracking)</label>
+            <input type="password" id="dev-key-rapidapi" placeholder="your-rapidapi-key"
+              style="width:100%;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:13px;box-sizing:border-box;" />
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">Firebase Config (JSON)</label>
+            <textarea id="dev-key-firebase" rows="3" placeholder='{"apiKey":"…","databaseURL":"…"}'
+              style="width:100%;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:12px;font-family:monospace;box-sizing:border-box;resize:vertical;"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;color:var(--text-secondary);display:block;margin-bottom:4px;">Cloudinary Config (JSON)</label>
+            <textarea id="dev-key-cloudinary" rows="2" placeholder='{"cloudName":"…","uploadPreset":"…"}'
+              style="width:100%;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:12px;font-family:monospace;box-sizing:border-box;resize:vertical;"></textarea>
+          </div>
+        </div>
+        <button id="dev-save-keys-btn" class="full-btn primary" style="margin-top:14px;">
+          🔑 Save Keys to This Device
+        </button>
+      </div>
+
       <!-- Testing -->
       <div class="card" style="margin-bottom:14px;">
         <div class="card-title" style="margin-bottom:10px;">Testing</div>

@@ -11,7 +11,7 @@ const CONFIG = {
   // Get your key at: https://platform.openai.com/api-keys
   // gpt-4o supports both text and photo analysis (vision)
   // ----------------------------------------------------------
-  OPENAI_API_KEY: 'YOUR_OPENAI_API_KEY_HERE',
+  OPENAI_API_KEY: localStorage.getItem('riley_key_openai') || '',
   OPENAI_MODEL: 'gpt-4o-mini',
   OPENAI_MAX_TOKENS: 1000,
 
@@ -20,7 +20,7 @@ const CONFIG = {
   // Sign up at: https://rapidapi.com/aedbx-aedbx/api/aerodatabox
   // Subscribe to the "Basic" (free) plan.
   // ----------------------------------------------------------
-  RAPIDAPI_KEY: 'YOUR_RAPIDAPI_KEY_HERE',
+  RAPIDAPI_KEY: localStorage.getItem('riley_key_rapidapi') || '',
   AERODATABOX_HOST: 'aerodatabox.p.rapidapi.com',
 
   // ----------------------------------------------------------
@@ -28,15 +28,9 @@ const CONFIG = {
   // Setup: https://console.firebase.google.com → New project → Realtime Database
   // In Database Rules tab, set: { "rules": { ".read": true, ".write": true } }
   // ----------------------------------------------------------
-  FIREBASE_CONFIG: {
-    apiKey:            'YOUR_FIREBASE_API_KEY',
-    authDomain:        'YOUR_PROJECT_ID.firebaseapp.com',
-    databaseURL:       'https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com',
-    projectId:         'YOUR_PROJECT_ID',
-    storageBucket:     'YOUR_PROJECT_ID.appspot.com',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    appId:             'YOUR_APP_ID',
-  },
+  FIREBASE_CONFIG: (() => {
+    try { return JSON.parse(localStorage.getItem('riley_key_firebase') || 'null') || {}; } catch { return {}; }
+  })(),
 
   // ----------------------------------------------------------
   // Web Push (VAPID) — optional push notifications
@@ -79,10 +73,9 @@ const CONFIG = {
   // 2. Set Signing Mode to "Unsigned"
   // 3. Paste the preset name below, and your Cloud Name from the dashboard
   // ----------------------------------------------------------
-  CLOUDINARY_CONFIG: {
-    cloudName:    'YOUR_CLOUD_NAME',
-    uploadPreset: 'YOUR_UNSIGNED_PRESET',
-  },
+  CLOUDINARY_CONFIG: (() => {
+    try { return JSON.parse(localStorage.getItem('riley_key_cloudinary') || 'null') || {}; } catch { return {}; }
+  })(),
 
   // Base path for GitHub Pages deployment (used for audio file URLs)
   BASE_PATH: '/RileyFamilyPhotoDump',
