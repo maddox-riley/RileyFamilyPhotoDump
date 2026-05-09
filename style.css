@@ -401,6 +401,13 @@ img, video {
   border: 1.5px solid var(--surface);
 }
 
+/* Dump upload section — flex column so cards stack with proper gap */
+#dump-upload-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 /* ── Cards ───────────────────────────────────────────────── */
 .card {
   background: var(--surface);
@@ -1272,25 +1279,20 @@ img, video {
 }
 
 .reveal-media-strip {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 16px 0 8px;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
   width: 100%;
-  max-width: 400px;
+  max-width: 420px;
+  padding: 16px 0 8px;
   animation: fadeUp 0.6s var(--ease) 0.3s both;
 }
 
-.reveal-media-strip::-webkit-scrollbar { display: none; }
-
 .reveal-thumb {
-  width: 80px;
-  height: 80px;
-  border-radius: 12px;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 10px;
   object-fit: cover;
-  flex-shrink: 0;
   border: 2px solid rgba(255,255,255,0.2);
 }
 

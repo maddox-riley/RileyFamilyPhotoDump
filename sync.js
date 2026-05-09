@@ -10,8 +10,9 @@
 // ============================================================
 
 window.Sync = (() => {
-  let firebaseDB = null;
-  let initialized = false;
+  let firebaseDB      = null;
+  let firebaseStorage = null;
+  let initialized     = false;
 
   function isConfigured() {
     const cfg = CONFIG.FIREBASE_CONFIG;
@@ -43,14 +44,17 @@ window.Sync = (() => {
       const v = '10.12.0';
       await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-app-compat.js`);
       await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-database-compat.js`);
+      await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-storage-compat.js`);
       if (!firebase.apps.length) {
         firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
       }
-      firebaseDB = firebase.database();
-      console.log('Sync: Firebase connected.');
+      firebaseDB      = firebase.database();
+      firebaseStorage = firebase.storage();
+      console.log('Sync: Firebase connected (DB + Storage).');
     } catch (e) {
       console.warn('Sync: Firebase init failed, falling back to localStorage.', e);
-      firebaseDB = null;
+      firebaseDB      = null;
+      firebaseStorage = null;
     }
   }
 
@@ -112,6 +116,19 @@ window.Sync = (() => {
     return () => {};
   }
 
+  // ── Upload a blob to Firebase Storage ────────────────────
+  // Returns the public download URL.
+  async function uploadBlob(storagePath, blob) {
+    if (!firebaseStorage) throw new Error('Firebase Storage not available');
+    const ref = firebaseStorage.ref(storagePath);
+    const snapshot = await ref.put(blob, {
+      contentType: blob.type || 'application/octet-stream',
+    });
+    return await snapshot.ref.getDownloadURL();
+  }
+
+  function hasStorage() { return !!firebaseStorage; }
+
   // ── Remove a value ────────────────────────────────────────
   async function remove(path) {
     localStorage.removeItem(lsKey(path));
@@ -123,6 +140,6 @@ window.Sync = (() => {
   }
 
   // ── Public API ────────────────────────────────────────────
-  return { init, set, get, subscribe, remove, isConfigured };
+  return { init, set, get, subscribe, remove, isConfigured, uploadBlob, hasStorage };
 
 })();

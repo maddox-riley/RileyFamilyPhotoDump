@@ -137,13 +137,15 @@ window.Dump = (() => {
     return `${start.toLocaleDateString('en-US', opts)} – ${end.toLocaleDateString('en-US', opts)}`;
   }
 
-  // ── Save media to IndexedDB ───────────────────────────────
+  // ── Save media to IndexedDB (+ Firebase Storage if configured) ──
   async function saveMediaItem(blob, type, filename, mimeType) {
     await openDB();
     const weekKey  = App.getWeekKey();
     const uploader = App.getCurrentMember();
+    // Unique key so other devices can deduplicate on sync
+    const localKey = `${uploader}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const item = {
-      weekKey, uploader, type,
+      weekKey, uploader, type, localKey,
       data: blob,
       filename: filename || `${type}-${Date.now()}`,
       mimeType: mimeType || blob.type,
@@ -151,6 +153,26 @@ window.Dump = (() => {
     };
     await idbPut(STORE_MEDIA, item);
     vibrate(10);
+
+    // Upload to Firebase so all other devices get it
+    if (window.Sync && Sync.isConfigured() && Sync.hasStorage()) {
+      (async () => {
+        try {
+          const storagePath = `media/${weekKey}/${localKey}`;
+          const downloadURL = await Sync.uploadBlob(storagePath, blob);
+          // Write metadata to Realtime DB — other devices subscribe to this
+          await Sync.set(`media/${weekKey}/${localKey}`, {
+            uploader, type, localKey, storagePath, downloadURL,
+            filename: item.filename,
+            mimeType: item.mimeType,
+            timestamp: item.timestamp,
+          });
+        } catch (e) {
+          console.warn('Media sync upload failed (media saved locally):', e);
+        }
+      })();
+    }
+
     await refreshDumpUI();
     await refreshHomeStats();
   }
@@ -729,24 +751,36 @@ window.Dump = (() => {
   function wireRevealInteractions() {
     const overlay = document.getElementById('reveal-overlay');
     const closeBtn = document.getElementById('reveal-close-btn');
+    let didSwipe = false;
 
-    // Tap to advance
+    // ── Tap: left half = back, right half = forward (Instagram Stories) ──
     overlay.addEventListener('click', (e) => {
+      if (didSwipe) { didSwipe = false; return; } // swipe already handled it
       if (e.target.closest('#reveal-close-btn')) return;
       if (e.target.closest('#reveal-music-ctrl')) return;
       if (e.target.tagName === 'AUDIO') return;
-      advanceCard();
+
+      const leftHalf = e.clientX < window.innerWidth / 2;
+      if (leftHalf && currentCard > 0) {
+        showCard(currentCard - 1);
+      } else {
+        advanceCard();
+      }
     });
 
-    // Swipe support
+    // ── Swipe support ─────────────────────────────────────────
     overlay.addEventListener('touchstart', (e) => {
       revealTouchStartX = e.touches[0].clientX;
+      didSwipe = false;
     }, { passive: true });
 
     overlay.addEventListener('touchend', (e) => {
       const dx = e.changedTouches[0].clientX - revealTouchStartX;
-      if (dx < -50) advanceCard();               // swipe left = next
-      if (dx > 80 && currentCard > 0) showCard(currentCard - 1); // swipe right = back
+      if (Math.abs(dx) > 50) {
+        didSwipe = true; // suppress the subsequent click
+        if (dx < 0) advanceCard();                              // swipe left  → next
+        else if (currentCard > 0) showCard(currentCard - 1);   // swipe right → back
+      }
     }, { passive: true });
 
     closeBtn?.addEventListener('click', (e) => {
@@ -755,9 +789,52 @@ window.Dump = (() => {
     });
   }
 
+  // ── Sync media from Firebase (pull items uploaded on other devices) ──
+  function subscribeMediaSync(weekKey) {
+    if (!window.Sync || !Sync.isConfigured() || !Sync.hasStorage()) return;
+
+    Sync.subscribe(`media/${weekKey}`, async (allRemote) => {
+      if (!allRemote) return;
+      await openDB();
+      const existing    = await getWeekMedia(weekKey);
+      const knownKeys   = new Set(existing.filter(m => m.localKey).map(m => m.localKey));
+
+      let added = 0;
+      for (const meta of Object.values(allRemote)) {
+        if (!meta?.localKey || knownKeys.has(meta.localKey)) continue;
+        try {
+          const resp = await fetch(meta.downloadURL);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const blob = await resp.blob();
+          await idbPut(STORE_MEDIA, {
+            weekKey,
+            uploader:  meta.uploader,
+            type:      meta.type,
+            localKey:  meta.localKey,
+            storagePath: meta.storagePath,
+            data:      blob,
+            filename:  meta.filename,
+            mimeType:  meta.mimeType,
+            timestamp: meta.timestamp,
+          });
+          knownKeys.add(meta.localKey);
+          added++;
+        } catch (e) {
+          console.warn('Media sync: failed to download item', meta.localKey, e);
+        }
+      }
+      if (added > 0) {
+        await refreshDumpUI();
+        await refreshHomeStats();
+      }
+    });
+  }
+
   // ── Init ──────────────────────────────────────────────────
   async function init() {
     await openDB();
+    // Subscribe to cross-device media sync for this week
+    subscribeMediaSync(App.getWeekKey());
     await refreshDumpUI();
     startCountdown();
     wireRevealInteractions();
