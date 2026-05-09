@@ -264,6 +264,13 @@ window.App = (() => {
 
     // Init sync first so config overrides are available before modules init
     await Sync.init();
+    if (!Sync.isConfigured()) {
+      console.warn('Firebase not configured — running offline only.');
+    } else if (!window.firebase?.apps?.length) {
+      console.warn('Firebase failed to connect.');
+    } else {
+      console.log('Firebase connected ✓');
+    }
 
     // Subscribe to week start changes (keeps all devices in sync)
     Sync.subscribe('config/weekStart', (weekStart) => {

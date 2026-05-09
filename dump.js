@@ -159,17 +159,25 @@ window.Dump = (() => {
       (async () => {
         try {
           const downloadURL = await Sync.uploadMedia(blob);
-          // Write metadata to Realtime DB — other devices subscribe to this
           await Sync.set(`media/${weekKey}/${localKey}`, {
             uploader, type, localKey, downloadURL,
             filename: item.filename,
             mimeType: item.mimeType,
             timestamp: item.timestamp,
           });
+          console.log('Media synced ✓', localKey);
         } catch (e) {
-          console.warn('Media sync upload failed (media saved locally):', e);
+          console.warn('Media sync upload failed:', e);
+          if (window.Tracker) Tracker.showInAppAlert(
+            '⚠️ Sync failed',
+            e.message || 'Could not upload to cloud. Check Cloudinary preset name and Firebase rules.'
+          );
         }
       })();
+    } else if (window.Sync && !Sync.isConfigured()) {
+      console.warn('Sync skipped — Firebase not configured');
+    } else if (window.Sync && !Sync.isMediaConfigured()) {
+      console.warn('Sync skipped — Cloudinary not configured');
     }
 
     await refreshDumpUI();
