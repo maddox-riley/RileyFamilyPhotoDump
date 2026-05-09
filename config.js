@@ -23,7 +23,7 @@ const CONFIG = {
   // AeroDataBox via RapidAPI — live flight tracking
   // Sign up free at: https://rapidapi.com → search AeroDataBox
   // ----------------------------------------------------------
-  RAPIDAPI_KEY:      'YOUR_RAPIDAPI_KEY_HERE',
+  RAPIDAPI_KEY:      '915e3471f4msh886089258e1f998p110383jsn623b2297d589',
   AERODATABOX_HOST:  'aerodatabox.p.rapidapi.com',
 
   // ----------------------------------------------------------
