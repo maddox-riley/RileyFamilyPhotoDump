@@ -1,22 +1,32 @@
 // ============================================================
 // Riley Family — Sync Module
 // Cross-device data sync via Firebase Realtime Database.
+// Media (photos/videos) uploaded via Cloudinary (free tier).
 // Falls back to localStorage if Firebase is not configured.
 //
-// SETUP: Add your Firebase config to config.js under FIREBASE_CONFIG.
-// Firebase console: https://console.firebase.google.com
-// In Realtime Database rules, set:
-//   { "rules": { ".read": true, ".write": true } }
+// SETUP:
+//   1. Add your Firebase config to config.js under FIREBASE_CONFIG.
+//      Firebase console: https://console.firebase.google.com
+//      In Realtime Database rules, set:
+//        { "rules": { ".read": true, ".write": true } }
+//   2. Add your Cloudinary config to config.js under CLOUDINARY_CONFIG.
+//      Sign up free at: https://cloudinary.com
+//      Create an unsigned upload preset in Settings → Upload.
 // ============================================================
 
 window.Sync = (() => {
-  let firebaseDB      = null;
-  let firebaseStorage = null;
-  let initialized     = false;
+  let firebaseDB  = null;
+  let initialized = false;
 
   function isConfigured() {
     const cfg = CONFIG.FIREBASE_CONFIG;
     return !!(cfg && cfg.databaseURL && !cfg.databaseURL.includes('YOUR_'));
+  }
+
+  function isMediaConfigured() {
+    const cfg = CONFIG.CLOUDINARY_CONFIG;
+    return !!(cfg && cfg.cloudName && !cfg.cloudName.includes('YOUR_') &&
+              cfg.uploadPreset && !cfg.uploadPreset.includes('YOUR_'));
   }
 
   // ── Load Firebase compat SDK dynamically ──────────────────
@@ -44,17 +54,14 @@ window.Sync = (() => {
       const v = '10.12.0';
       await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-app-compat.js`);
       await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-database-compat.js`);
-      await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-storage-compat.js`);
       if (!firebase.apps.length) {
         firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
       }
-      firebaseDB      = firebase.database();
-      firebaseStorage = firebase.storage();
-      console.log('Sync: Firebase connected (DB + Storage).');
+      firebaseDB = firebase.database();
+      console.log('Sync: Firebase connected.');
     } catch (e) {
       console.warn('Sync: Firebase init failed, falling back to localStorage.', e);
-      firebaseDB      = null;
-      firebaseStorage = null;
+      firebaseDB = null;
     }
   }
 
@@ -116,18 +123,22 @@ window.Sync = (() => {
     return () => {};
   }
 
-  // ── Upload a blob to Firebase Storage ────────────────────
-  // Returns the public download URL.
-  async function uploadBlob(storagePath, blob) {
-    if (!firebaseStorage) throw new Error('Firebase Storage not available');
-    const ref = firebaseStorage.ref(storagePath);
-    const snapshot = await ref.put(blob, {
-      contentType: blob.type || 'application/octet-stream',
-    });
-    return await snapshot.ref.getDownloadURL();
+  // ── Upload a blob to Cloudinary (free tier) ──────────────
+  // Returns the public secure_url.
+  async function uploadMedia(blob) {
+    if (!isMediaConfigured()) throw new Error('Cloudinary not configured');
+    const { cloudName, uploadPreset } = CONFIG.CLOUDINARY_CONFIG;
+    const formData = new FormData();
+    formData.append('file', blob);
+    formData.append('upload_preset', uploadPreset);
+    const resp = await fetch(
+      `https://api.cloudinary.com/v1_1/${cloudName}/upload`,
+      { method: 'POST', body: formData }
+    );
+    if (!resp.ok) throw new Error(`Cloudinary upload failed: ${resp.status}`);
+    const data = await resp.json();
+    return data.secure_url;
   }
-
-  function hasStorage() { return !!firebaseStorage; }
 
   // ── Remove a value ────────────────────────────────────────
   async function remove(path) {
@@ -140,6 +151,6 @@ window.Sync = (() => {
   }
 
   // ── Public API ────────────────────────────────────────────
-  return { init, set, get, subscribe, remove, isConfigured, uploadBlob, hasStorage };
+  return { init, set, get, subscribe, remove, isConfigured, isMediaConfigured, uploadMedia };
 
 })();

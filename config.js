@@ -71,6 +71,18 @@ const CONFIG = {
     WORK_CITY: 'Dallas',
   },
 
+  // ----------------------------------------------------------
+  // Cloudinary — free photo/video cloud storage for cross-device sync
+  // Sign up free at: https://cloudinary.com (25 GB free)
+  // 1. Go to Settings → Upload → Add upload preset
+  // 2. Set Signing Mode to "Unsigned"
+  // 3. Paste the preset name below, and your Cloud Name from the dashboard
+  // ----------------------------------------------------------
+  CLOUDINARY_CONFIG: {
+    cloudName:    'YOUR_CLOUD_NAME',
+    uploadPreset: 'YOUR_UNSIGNED_PRESET',
+  },
+
   // Base path for GitHub Pages deployment (used for audio file URLs)
   BASE_PATH: '/RileyFamilyPhotoDump',
 

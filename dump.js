@@ -154,15 +154,14 @@ window.Dump = (() => {
     await idbPut(STORE_MEDIA, item);
     vibrate(10);
 
-    // Upload to Firebase so all other devices get it
-    if (window.Sync && Sync.isConfigured() && Sync.hasStorage()) {
+    // Upload to Cloudinary + write metadata to Firebase so all other devices get it
+    if (window.Sync && Sync.isConfigured() && Sync.isMediaConfigured()) {
       (async () => {
         try {
-          const storagePath = `media/${weekKey}/${localKey}`;
-          const downloadURL = await Sync.uploadBlob(storagePath, blob);
+          const downloadURL = await Sync.uploadMedia(blob);
           // Write metadata to Realtime DB — other devices subscribe to this
           await Sync.set(`media/${weekKey}/${localKey}`, {
-            uploader, type, localKey, storagePath, downloadURL,
+            uploader, type, localKey, downloadURL,
             filename: item.filename,
             mimeType: item.mimeType,
             timestamp: item.timestamp,
@@ -789,9 +788,9 @@ window.Dump = (() => {
     });
   }
 
-  // ── Sync media from Firebase (pull items uploaded on other devices) ──
+  // ── Sync media from Cloudinary (pull items uploaded on other devices) ──
   function subscribeMediaSync(weekKey) {
-    if (!window.Sync || !Sync.isConfigured() || !Sync.hasStorage()) return;
+    if (!window.Sync || !Sync.isConfigured() || !Sync.isMediaConfigured()) return;
 
     Sync.subscribe(`media/${weekKey}`, async (allRemote) => {
       if (!allRemote) return;
@@ -811,7 +810,6 @@ window.Dump = (() => {
             uploader:  meta.uploader,
             type:      meta.type,
             localKey:  meta.localKey,
-            storagePath: meta.storagePath,
             data:      blob,
             filename:  meta.filename,
             mimeType:  meta.mimeType,
