@@ -44,7 +44,7 @@ const CONFIG = {
   // ----------------------------------------------------------
   APP: {
     NAME: 'Riley Family',
-    MEMBERS: ['Dad', 'Mom', 'Maddox', 'Dylan'],
+    MEMBERS: ['Maddox', 'Dylan', 'Mom', 'Dad'],
 
     // Reveal: Wednesday at noon (day index: 0=Sun, 1=Mon, ... 6=Sat)
     REVEAL_DAY: 3,

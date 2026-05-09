@@ -1571,6 +1571,11 @@ img, video {
 }
 
 /* ── Setup Screen ───────────────────────────────────────── */
+#screen-setup {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 .setup-wrap {
   width: 100%;
   max-width: 480px;
