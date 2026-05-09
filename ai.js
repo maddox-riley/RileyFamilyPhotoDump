@@ -1,5 +1,5 @@
 // ============================================================
-// Riley Family — AI Module (Anthropic API)
+// Riley Family — AI Module (OpenAI API)
 // Generates member summaries and picks the Family Moment
 // ============================================================
 
@@ -42,44 +42,40 @@ window.AI = (() => {
     });
   }
 
-  // Extract JPEG base64 string from data URL
-  function dataURLtoBase64(dataURL) {
-    return dataURL.split(',')[1];
-  }
+  // ── Core API call (OpenAI chat completions) ───────────────
 
-  // ── Core API call ─────────────────────────────────────────
-
-  async function callClaude(messages, systemPrompt = '') {
-    const apiKey = CONFIG.ANTHROPIC_API_KEY;
-    if (!apiKey || apiKey === 'YOUR_ANTHROPIC_API_KEY_HERE') {
-      throw new Error('Anthropic API key not configured. Add your key to config.js.');
+  async function callOpenAI(messages, systemPrompt = '') {
+    const apiKey = CONFIG.OPENAI_API_KEY;
+    if (!apiKey || apiKey === 'YOUR_OPENAI_API_KEY_HERE') {
+      throw new Error('OpenAI API key not configured. Add your key to config.js.');
     }
 
-    const body = {
-      model: CONFIG.ANTHROPIC_MODEL,
-      max_tokens: CONFIG.ANTHROPIC_MAX_TOKENS,
-      messages,
-    };
-    if (systemPrompt) body.system = systemPrompt;
+    const allMessages = [];
+    if (systemPrompt) {
+      allMessages.push({ role: 'system', content: systemPrompt });
+    }
+    allMessages.push(...messages);
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-        'content-type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        model: CONFIG.OPENAI_MODEL,
+        max_tokens: CONFIG.OPENAI_MAX_TOKENS,
+        messages: allMessages,
+      }),
     });
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error?.message || `API error ${resp.status}`);
+      throw new Error(err.error?.message || `OpenAI API error ${resp.status}`);
     }
 
     const data = await resp.json();
-    return data.content?.[0]?.text || '';
+    return data.choices?.[0]?.message?.content || '';
   }
 
   // ── Generate member summary ───────────────────────────────
@@ -89,23 +85,21 @@ window.AI = (() => {
     const cached = getCached(weekKey, member);
     if (cached) return cached;
 
-    const photos  = mediaItems.filter(m => m.type === 'photo');
-    const videos  = mediaItems.filter(m => m.type === 'video');
-    const voices  = mediaItems.filter(m => m.type === 'voice');
+    const photos = mediaItems.filter(m => m.type === 'photo');
+    const videos = mediaItems.filter(m => m.type === 'video');
+    const voices = mediaItems.filter(m => m.type === 'voice');
 
-    // Build message content
+    // Build message content array (OpenAI vision format)
     const content = [];
 
-    // Add up to 4 photos as images
+    // Add up to 4 photos as inline images
     const photoLimit = Math.min(photos.length, 4);
     for (let i = 0; i < photoLimit; i++) {
       try {
         const dataURL = await blobToBase64(photos[i].data);
-        const base64  = dataURLtoBase64(dataURL);
-        const mimeType = photos[i].mimeType || 'image/jpeg';
         content.push({
-          type: 'image',
-          source: { type: 'base64', media_type: mimeType, data: base64 },
+          type: 'image_url',
+          image_url: { url: dataURL, detail: 'low' },
         });
       } catch (e) {
         console.warn('Could not convert photo to base64:', e);
@@ -115,8 +109,8 @@ window.AI = (() => {
     // Build text description
     let desc = `Family member: ${member}\n`;
     desc += `Media shared this week: ${photos.length} photo(s), ${videos.length} video(s), ${voices.length} voice recording(s).\n`;
-    if (videos.length > 0)  desc += `They also shared ${videos.length} video(s) this week.\n`;
-    if (voices.length > 0)  desc += `They recorded ${voices.length} voice message(s) this week.\n`;
+    if (videos.length > 0) desc += `They also shared ${videos.length} video(s) this week.\n`;
+    if (voices.length > 0) desc += `They recorded ${voices.length} voice message(s) this week.\n`;
 
     content.push({ type: 'text', text: desc });
 
@@ -129,10 +123,10 @@ Response should be ONLY the summary sentences, no titles or labels.`;
 
     let summary;
     if (content.length === 1) {
-      // No photos, just text
-      summary = await callClaude([{ role: 'user', content: desc }], systemPrompt);
+      // No photos — just send the text description
+      summary = await callOpenAI([{ role: 'user', content: desc }], systemPrompt);
     } else {
-      summary = await callClaude([{ role: 'user', content }], systemPrompt);
+      summary = await callOpenAI([{ role: 'user', content }], systemPrompt);
     }
 
     const result = { summary, generatedAt: Date.now() };
@@ -149,10 +143,7 @@ Response should be ONLY the summary sentences, no titles or labels.`;
       try { return JSON.parse(cached); } catch {}
     }
 
-    // Build a description of all media for Claude to evaluate
     const lines = [];
-    let photoIndex = 0;
-    const photoMap = {}; // index → { member, item }
     const content = [];
 
     for (const [member, items] of Object.entries(allMediaByMember)) {
@@ -163,14 +154,10 @@ Response should be ONLY the summary sentences, no titles or labels.`;
       for (let i = 0; i < Math.min(2, photos.length); i++) {
         try {
           const dataURL = await blobToBase64(photos[i].data);
-          const base64 = dataURLtoBase64(dataURL);
-          const mimeType = photos[i].mimeType || 'image/jpeg';
           content.push({
-            type: 'image',
-            source: { type: 'base64', media_type: mimeType, data: base64 },
+            type: 'image_url',
+            image_url: { url: dataURL, detail: 'low' },
           });
-          photoMap[photoIndex] = { member, item: photos[i] };
-          photoIndex++;
         } catch {}
       }
     }
@@ -185,9 +172,9 @@ Response should be ONLY the summary sentences, no titles or labels.`;
     let explanation;
     try {
       if (content.length > 1) {
-        explanation = await callClaude([{ role: 'user', content }], systemPrompt);
+        explanation = await callOpenAI([{ role: 'user', content }], systemPrompt);
       } else {
-        explanation = await callClaude([{ role: 'user', content: content[0].text }], systemPrompt);
+        explanation = await callOpenAI([{ role: 'user', content: content[0].text }], systemPrompt);
       }
     } catch (e) {
       explanation = 'A special week full of shared memories with the people who matter most. 💙';

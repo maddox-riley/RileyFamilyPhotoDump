@@ -7,12 +7,13 @@
 const CONFIG = {
 
   // ----------------------------------------------------------
-  // Anthropic API — AI-generated member summaries & family moment
-  // Get your key at: https://console.anthropic.com
+  // OpenAI API — AI-generated member summaries & family moment
+  // Get your key at: https://platform.openai.com/api-keys
+  // gpt-4o supports both text and photo analysis (vision)
   // ----------------------------------------------------------
-  ANTHROPIC_API_KEY: 'YOUR_ANTHROPIC_API_KEY_HERE',
-  ANTHROPIC_MODEL: 'claude-sonnet-4-20250514',
-  ANTHROPIC_MAX_TOKENS: 1000,
+  OPENAI_API_KEY: 'YOUR_OPENAI_API_KEY_HERE',
+  OPENAI_MODEL: 'gpt-4o',
+  OPENAI_MAX_TOKENS: 1000,
 
   // ----------------------------------------------------------
   // AeroDataBox via RapidAPI — live flight tracking
