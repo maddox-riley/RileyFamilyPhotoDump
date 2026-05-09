@@ -243,28 +243,51 @@ window.App = (() => {
     if (cloudinaryInput) cloudinaryInput.value = localStorage.getItem('riley_key_cloudinary') || '';
 
     document.getElementById('dev-save-keys-btn')?.addEventListener('click', async () => {
-      const openai    = openaiInput?.value.trim();
-      const rapidapi  = rapidapiInput?.value.trim();
-      const firebase  = firebaseInput?.value.trim();
-      const cloudinary= cloudinaryInput?.value.trim();
+      const openai     = openaiInput?.value.trim();
+      const rapidapi   = rapidapiInput?.value.trim();
+      const firebaseStr  = firebaseInput?.value.trim();
+      const cloudinaryStr= cloudinaryInput?.value.trim();
 
-      if (openai)    localStorage.setItem('riley_key_openai',    openai);
-      if (rapidapi)  localStorage.setItem('riley_key_rapidapi',  rapidapi);
+      if (openai)   localStorage.setItem('riley_key_openai',   openai);
+      if (rapidapi) localStorage.setItem('riley_key_rapidapi', rapidapi);
 
-      if (firebase) {
-        try { JSON.parse(firebase); localStorage.setItem('riley_key_firebase', firebase); }
+      let firebaseParsed   = null;
+      let cloudinaryParsed = null;
+
+      if (firebaseStr) {
+        try { firebaseParsed = JSON.parse(firebaseStr); localStorage.setItem('riley_key_firebase', firebaseStr); }
         catch { alert('Firebase config is not valid JSON — check the format and try again.'); return; }
       }
-      if (cloudinary) {
-        try { JSON.parse(cloudinary); localStorage.setItem('riley_key_cloudinary', cloudinary); }
+      if (cloudinaryStr) {
+        try { cloudinaryParsed = JSON.parse(cloudinaryStr); localStorage.setItem('riley_key_cloudinary', cloudinaryStr); }
         catch { alert('Cloudinary config is not valid JSON — check the format and try again.'); return; }
       }
 
-      // Re-init Sync so Firebase picks up the new config immediately
-      if (firebase && window.Sync) await Sync.init();
+      // Update CONFIG in memory immediately — no reload needed
+      if (openai)           CONFIG.OPENAI_API_KEY      = openai;
+      if (rapidapi)         CONFIG.RAPIDAPI_KEY         = rapidapi;
+      if (firebaseParsed)   CONFIG.FIREBASE_CONFIG      = firebaseParsed;
+      if (cloudinaryParsed) CONFIG.CLOUDINARY_CONFIG    = cloudinaryParsed;
+
+      // Force Sync to reconnect with the new Firebase config
+      if (firebaseParsed && window.Sync) {
+        await Sync.init(true);
+        // Re-subscribe to live channels now that Firebase is connected
+        Sync.subscribe('config/weekStart', (weekStart) => {
+          if (weekStart && typeof weekStart === 'string') {
+            localStorage.setItem('riley_sync_config__weekStart', JSON.stringify(weekStart));
+            if (window.Dump) Dump.refreshScheduleUI();
+          }
+        });
+        Sync.subscribe('config/revealForced', () => {
+          if (window.Dump) Dump.refreshScheduleUI();
+        });
+        if (window.Flight) Flight.init();
+        if (window.Dump)   Dump.init();
+      }
 
       closeDevModal();
-      Tracker.showInAppAlert('Keys saved', 'API keys saved to this device. Reload the app to apply all changes.');
+      Tracker.showInAppAlert('Keys saved', 'All keys are active on this device.');
     });
   }
 

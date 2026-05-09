@@ -41,8 +41,16 @@ window.Sync = (() => {
     });
   }
 
-  async function init() {
-    if (initialized) return;
+  async function init(force = false) {
+    if (initialized && !force) return;
+
+    // On force re-init, tear down the existing Firebase connection
+    if (force && firebaseDB) {
+      try { firebase.app().delete(); } catch {}
+      firebaseDB  = null;
+      initialized = false;
+    }
+
     initialized = true;
 
     if (!isConfigured()) {
@@ -56,6 +64,9 @@ window.Sync = (() => {
       await loadScript(`https://www.gstatic.com/firebasejs/${v}/firebase-database-compat.js`);
       if (!firebase.apps.length) {
         firebase.initializeApp(CONFIG.FIREBASE_CONFIG);
+      } else {
+        // Re-use the existing app (same config)
+        firebase.app();
       }
       firebaseDB = firebase.database();
       console.log('Sync: Firebase connected.');
