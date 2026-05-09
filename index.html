@@ -33,42 +33,15 @@
       <div class="setup-header">
         <div class="app-icon">🏠</div>
         <h1>Riley Family</h1>
-        <p>Set up this device to sync with everyone.</p>
-      </div>
-
-      <!-- Banner shown when a setup link was detected -->
-      <div id="setup-link-banner" class="setup-banner hidden">
-        ✅ Config received! Review below and tap <strong>Save & Continue</strong>.
-      </div>
-
-      <!-- ── Firebase ───────────────────────────────────── -->
-      <div class="setup-section">
-        <div class="setup-section-title">🔄 Sync (Firebase)</div>
-        <p class="setup-section-desc">
-          Go to <strong>console.firebase.google.com</strong> → your project → Project Settings → scroll to "Your apps" → copy the <code>firebaseConfig</code> object and paste it below.
-        </p>
-        <label class="setup-label">Firebase Config</label>
-        <textarea id="setup-firebase" class="setup-textarea" rows="5"
-          placeholder='Paste the firebaseConfig JSON here, e.g.&#10;{&#10;  "apiKey": "AIza...",&#10;  "databaseURL": "https://...",&#10;  ...&#10;}'></textarea>
-      </div>
-
-      <!-- ── Cloudinary ─────────────────────────────────── -->
-      <div class="setup-section">
-        <div class="setup-section-title">📸 Photo &amp; Video Sync (Cloudinary)</div>
-        <p class="setup-section-desc">
-          From your <strong>cloudinary.com</strong> dashboard. Cloud Name is on the home page. Upload Preset is under Settings → Upload (must be set to Unsigned).
-        </p>
-        <label class="setup-label">Cloud Name</label>
-        <input type="text" id="setup-cloudname" class="setup-input" placeholder="e.g. riley-family" autocomplete="off" />
-        <label class="setup-label" style="margin-top:10px;">Upload Preset</label>
-        <input type="text" id="setup-preset" class="setup-input" placeholder="e.g. riley_unsigned" autocomplete="off" />
+        <p>One quick step before you get started.</p>
       </div>
 
       <!-- ── OpenAI ─────────────────────────────────────── -->
       <div class="setup-section">
-        <div class="setup-section-title">🤖 AI Summaries (Optional)</div>
+        <div class="setup-section-title">🤖 AI Summaries</div>
         <p class="setup-section-desc">
-          Only needed on <strong>one device</strong> (Dad's). Summaries are generated once and shared with everyone automatically. Get your key at <strong>platform.openai.com/api-keys</strong>.
+          Only needed on <strong>Dad's device</strong>. Summaries are generated once and shared with everyone automatically — no one else needs this.<br/><br/>
+          Get your key at <strong>platform.openai.com/api-keys</strong>.
         </p>
         <label class="setup-label">OpenAI API Key</label>
         <input type="password" id="setup-openai" class="setup-input" placeholder="sk-proj-…" autocomplete="off" />
@@ -79,7 +52,7 @@
           Save &amp; Continue →
         </button>
         <button id="setup-skip-btn" class="full-btn secondary">
-          Skip for now
+          Skip — I don't need AI summaries
         </button>
       </div>
 
@@ -436,17 +409,14 @@
         </button>
       </div>
 
-      <!-- Share setup link -->
+      <!-- OpenAI key -->
       <div class="card" style="margin-bottom:14px;">
-        <div class="card-title" style="margin-bottom:4px;">Share Setup</div>
+        <div class="card-title" style="margin-bottom:4px;">AI Summaries</div>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
-          Generate a link that pre-fills the setup screen on other devices. Send it via iMessage — they just tap it and hit Save.
+          Update the OpenAI API key saved on this device.
         </p>
-        <button id="dev-share-setup-btn" class="full-btn" style="background:rgba(52,199,89,0.12);color:var(--green);border:1px solid rgba(52,199,89,0.3);">
-          🔗 Share Setup Link
-        </button>
-        <button id="dev-open-setup-btn" class="full-btn secondary" style="margin-top:10px;">
-          ⚙️ Edit My Setup
+        <button id="dev-open-setup-btn" class="full-btn secondary">
+          🔑 Update OpenAI Key
         </button>
       </div>
 

@@ -230,25 +230,6 @@ window.App = (() => {
       Dump.forceReveal();
     });
 
-    // ── Share setup link ──────────────────────────────────────
-    document.getElementById('dev-share-setup-btn')?.addEventListener('click', async () => {
-      const link = Setup.generateLink();
-      if (navigator.share) {
-        try {
-          await navigator.share({ title: 'Riley Family — Device Setup', url: link });
-          return;
-        } catch {}
-      }
-      // Fallback: copy to clipboard
-      try {
-        await navigator.clipboard.writeText(link);
-        Tracker.showInAppAlert('Link copied!', 'Paste it in iMessage and send to the family.');
-      } catch {
-        prompt('Copy this setup link and send via iMessage:', link);
-      }
-      closeDevModal();
-    });
-
     // ── Open setup screen from dev modal ─────────────────────
     document.getElementById('dev-open-setup-btn')?.addEventListener('click', () => {
       closeDevModal();
