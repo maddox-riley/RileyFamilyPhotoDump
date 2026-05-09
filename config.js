@@ -12,7 +12,7 @@ const CONFIG = {
   // gpt-4o supports both text and photo analysis (vision)
   // ----------------------------------------------------------
   OPENAI_API_KEY: 'YOUR_OPENAI_API_KEY_HERE',
-  OPENAI_MODEL: 'gpt-4o',
+  OPENAI_MODEL: 'gpt-4o-mini',
   OPENAI_MAX_TOKENS: 1000,
 
   // ----------------------------------------------------------
