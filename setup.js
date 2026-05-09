@@ -1,7 +1,8 @@
 // ============================================================
 // Riley Family — Setup Module
-// Shows a first-run screen to collect the OpenAI API key on
-// Dad's device. All other config lives in config.js directly.
+// Shows a first-run screen to collect API keys on Dad's device.
+// OpenAI (AI summaries) + RapidAPI (flight tracking).
+// All other config lives in config.js directly.
 // ============================================================
 
 window.Setup = (() => {
@@ -31,11 +32,18 @@ window.Setup = (() => {
   // ── Save handler ──────────────────────────────────────────
 
   function saveAndContinue() {
-    const key = document.getElementById('setup-openai')?.value.trim();
-    if (key) {
-      localStorage.setItem('riley_key_openai', key);
-      CONFIG.OPENAI_API_KEY = key;
+    const openaiKey  = document.getElementById('setup-openai')?.value.trim();
+    const rapidapiKey = document.getElementById('setup-rapidapi')?.value.trim();
+
+    if (openaiKey) {
+      localStorage.setItem('riley_key_openai', openaiKey);
+      CONFIG.OPENAI_API_KEY = openaiKey;
     }
+    if (rapidapiKey) {
+      localStorage.setItem('riley_key_rapidapi', rapidapiKey);
+      CONFIG.RAPIDAPI_KEY = rapidapiKey;
+    }
+
     markDone();
     hideScreen();
     document.getElementById('screen-auth')?.classList.add('active');
@@ -50,17 +58,20 @@ window.Setup = (() => {
   // ── Open setup screen (from dev modal) ───────────────────
 
   function openSetupScreen() {
-    const el = document.getElementById('setup-openai');
-    if (el) el.value = localStorage.getItem('riley_key_openai') || '';
+    const openaiEl   = document.getElementById('setup-openai');
+    const rapidapiEl = document.getElementById('setup-rapidapi');
+    if (openaiEl)   openaiEl.value   = localStorage.getItem('riley_key_openai')   || '';
+    if (rapidapiEl) rapidapiEl.value = localStorage.getItem('riley_key_rapidapi') || '';
     showScreen();
   }
 
-  // ── Generate / parse setup link (OpenAI key only) ────────
+  // ── Generate / parse setup link ──────────────────────────
 
   function generateLink() {
-    const key = localStorage.getItem('riley_key_openai') || '';
-    if (!key) return null;
-    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify({ openai: key }))));
+    const openai   = localStorage.getItem('riley_key_openai')   || '';
+    const rapidapi = localStorage.getItem('riley_key_rapidapi') || '';
+    if (!openai && !rapidapi) return null;
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify({ openai, rapidapi }))));
     return `${window.location.href.split('#')[0]}#setup=${encoded}`;
   }
 
@@ -84,17 +95,21 @@ window.Setup = (() => {
 
     const fromLink = parseLink();
 
-    if (fromLink?.openai) {
-      // Pre-fill key from link
-      const el = document.getElementById('setup-openai');
-      if (el) el.value = fromLink.openai;
+    if (fromLink?.openai || fromLink?.rapidapi) {
+      // Pre-fill keys from link
+      const openaiEl   = document.getElementById('setup-openai');
+      const rapidapiEl = document.getElementById('setup-rapidapi');
+      if (openaiEl   && fromLink.openai)   openaiEl.value   = fromLink.openai;
+      if (rapidapiEl && fromLink.rapidapi) rapidapiEl.value = fromLink.rapidapi;
       history.replaceState(null, '', window.location.pathname + window.location.search);
       showScreen();
       return true;
     }
 
-    // Only show setup screen if OpenAI key not yet saved
-    if (isDone() || localStorage.getItem('riley_key_openai')) return false;
+    // Show setup if neither key is saved yet
+    const hasOpenai   = !!localStorage.getItem('riley_key_openai');
+    const hasRapidapi = !!localStorage.getItem('riley_key_rapidapi');
+    if (isDone() || (hasOpenai && hasRapidapi)) return false;
 
     showScreen();
     return true;

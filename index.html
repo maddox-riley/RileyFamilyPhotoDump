@@ -40,11 +40,22 @@
       <div class="setup-section">
         <div class="setup-section-title">🤖 AI Summaries</div>
         <p class="setup-section-desc">
-          Only needed on <strong>Dad's device</strong>. Summaries are generated once and shared with everyone automatically — no one else needs this.<br/><br/>
+          Only needed on <strong>Dad's device</strong>. Summaries are generated once and shared with everyone automatically.<br/><br/>
           Get your key at <strong>platform.openai.com/api-keys</strong>.
         </p>
         <label class="setup-label">OpenAI API Key</label>
         <input type="password" id="setup-openai" class="setup-input" placeholder="sk-proj-…" autocomplete="off" />
+      </div>
+
+      <!-- ── RapidAPI ──────────────────────────────────── -->
+      <div class="setup-section">
+        <div class="setup-section-title">✈️ Flight Tracking</div>
+        <p class="setup-section-desc">
+          Only needed on <strong>Dad's device</strong>. Tracks Dad's flights live so the family always knows when he lands.<br/><br/>
+          Get your free key at <strong>rapidapi.com</strong> → search <strong>AeroDataBox</strong> → subscribe to Basic (free).
+        </p>
+        <label class="setup-label">RapidAPI Key</label>
+        <input type="password" id="setup-rapidapi" class="setup-input" placeholder="Paste your RapidAPI key…" autocomplete="off" />
       </div>
 
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px;">
@@ -52,7 +63,7 @@
           Save &amp; Continue →
         </button>
         <button id="setup-skip-btn" class="full-btn secondary">
-          Skip — I don't need AI summaries
+          Skip for now
         </button>
       </div>
 
@@ -409,14 +420,14 @@
         </button>
       </div>
 
-      <!-- OpenAI key -->
+      <!-- API keys -->
       <div class="card" style="margin-bottom:14px;">
-        <div class="card-title" style="margin-bottom:4px;">AI Summaries</div>
+        <div class="card-title" style="margin-bottom:4px;">API Keys</div>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
-          Update the OpenAI API key saved on this device.
+          Update the OpenAI and RapidAPI keys saved on this device.
         </p>
         <button id="dev-open-setup-btn" class="full-btn secondary">
-          🔑 Update OpenAI Key
+          🔑 Update API Keys
         </button>
       </div>
 

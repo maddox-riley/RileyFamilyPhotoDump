@@ -21,9 +21,10 @@ const CONFIG = {
 
   // ----------------------------------------------------------
   // AeroDataBox via RapidAPI — live flight tracking
+  // Enter once on Dad's device via the setup screen.
   // Sign up free at: https://rapidapi.com → search AeroDataBox
   // ----------------------------------------------------------
-  RAPIDAPI_KEY:      '915e3471f4msh886089258e1f998p110383jsn623b2297d589',
+  RAPIDAPI_KEY:      localStorage.getItem('riley_key_rapidapi') || '',
   AERODATABOX_HOST:  'aerodatabox.p.rapidapi.com',
 
   // ----------------------------------------------------------
