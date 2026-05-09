@@ -33,13 +33,13 @@ const CONFIG = {
   // Rules: { "rules": { ".read": true, ".write": true } }
   // ----------------------------------------------------------
   FIREBASE_CONFIG: {
-    apiKey:            'YOUR_FIREBASE_API_KEY',
-    authDomain:        'YOUR_PROJECT_ID.firebaseapp.com',
-    databaseURL:       'https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com',
-    projectId:         'YOUR_PROJECT_ID',
-    storageBucket:     'YOUR_PROJECT_ID.appspot.com',
-    messagingSenderId: 'YOUR_SENDER_ID',
-    appId:             'YOUR_APP_ID',
+    apiKey:            'AIzaSyAchXiXsesZDM8gAAA-SbuRmHcjzVbyteE',
+    authDomain:        'rileyfamily-a6684.firebaseapp.com',
+    databaseURL:       'https://rileyfamily-a6684-default-rtdb.firebaseio.com',
+    projectId:         'rileyfamily-a6684',
+    storageBucket:     'rileyfamily-a6684.firebasestorage.app',
+    messagingSenderId: '152414020596',
+    appId:             '1:152414020596:web:223a08f530828bc7c90fa1',
   },
 
   // ----------------------------------------------------------
@@ -48,8 +48,8 @@ const CONFIG = {
   // Docs: https://cloudinary.com → Settings → Upload → Add preset
   // ----------------------------------------------------------
   CLOUDINARY_CONFIG: {
-    cloudName:    'YOUR_CLOUD_NAME',
-    uploadPreset: 'YOUR_UNSIGNED_PRESET',
+    cloudName:    'drxo3qwgk',
+    uploadPreset: 'RileyFamily',
   },
 
   // ----------------------------------------------------------
