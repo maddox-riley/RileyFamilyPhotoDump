@@ -89,6 +89,10 @@ window.Setup = (() => {
   }
 
   // ── Init — returns true if setup screen was shown ─────────
+  // The setup screen only shows when keys are passed via a link.
+  // All other first-run devices are silently marked done and proceed
+  // straight to the app. Keys are entered on Dad's device via the
+  // dev modal (long-press "Riley Family" → Update API Keys).
 
   function init() {
     wireButtons();
@@ -96,7 +100,7 @@ window.Setup = (() => {
     const fromLink = parseLink();
 
     if (fromLink?.openai || fromLink?.rapidapi) {
-      // Pre-fill keys from link
+      // Pre-fill keys from a setup link and show screen
       const openaiEl   = document.getElementById('setup-openai');
       const rapidapiEl = document.getElementById('setup-rapidapi');
       if (openaiEl   && fromLink.openai)   openaiEl.value   = fromLink.openai;
@@ -106,13 +110,9 @@ window.Setup = (() => {
       return true;
     }
 
-    // Show setup if neither key is saved yet
-    const hasOpenai   = !!localStorage.getItem('riley_key_openai');
-    const hasRapidapi = !!localStorage.getItem('riley_key_rapidapi');
-    if (isDone() || (hasOpenai && hasRapidapi)) return false;
-
-    showScreen();
-    return true;
+    // Auto-mark done on first run so the app is never blocked
+    if (!isDone()) markDone();
+    return false;
   }
 
   return { init, isDone, openSetupScreen, generateLink };

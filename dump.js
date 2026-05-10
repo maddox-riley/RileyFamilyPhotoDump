@@ -741,9 +741,13 @@ window.Dump = (() => {
       const result = await AI.generateMemberSummary(weekKey, card.member, card.items);
       el.innerHTML = result?.summary || `${card.member} had a great week! 🌟`;
     } catch (e) {
-      el.innerHTML = e.message.includes('not configured')
-        ? `<em style="opacity:0.6;font-size:13px;">Add your OpenAI API key in the setup screen for AI summaries.</em>`
-        : `${card.member} had a great week with the family! 🌟`;
+      console.error(`Summary error for ${card.member}:`, e.message);
+      if (e.message.includes('not configured')) {
+        el.innerHTML = `<em style="opacity:0.6;font-size:13px;">OpenAI key not set — enter it via the dev menu (long-press title).</em>`;
+      } else {
+        // Show actual error so it's visible during debugging
+        el.innerHTML = `<em style="opacity:0.6;font-size:12px;">⚠️ ${e.message}</em>`;
+      }
     }
   }
 
@@ -752,10 +756,12 @@ window.Dump = (() => {
     if (!el) return;
     try {
       const result = await AI.pickFamilyMoment(weekKey, grouped);
-      // explanation may be null if generation failed — show generic only as last resort
       el.innerHTML = result?.explanation || 'A week full of real moments from the people who matter most. 💙';
     } catch (e) {
-      el.innerHTML = 'A week full of real moments from the people who matter most. 💙';
+      console.error('Moment card error:', e.message);
+      el.innerHTML = e.message.includes('not configured')
+        ? `<em style="opacity:0.6;font-size:12px;">OpenAI key not set.</em>`
+        : `<em style="opacity:0.6;font-size:12px;">⚠️ ${e.message}</em>`;
     }
   }
 
@@ -841,12 +847,29 @@ window.Dump = (() => {
     Sync.subscribe(`media/${weekKey}`, async (allRemote) => {
       if (!allRemote) return;
       await openDB();
-      const existing    = await getWeekMedia(weekKey);
-      const knownKeys   = new Set(existing.filter(m => m.localKey).map(m => m.localKey));
+      const existing = await getWeekMedia(weekKey);
+
+      // Build a map by localKey so we can look up existing items quickly
+      const byLocalKey = {};
+      existing.forEach(m => { if (m.localKey) byLocalKey[m.localKey] = m; });
 
       let added = 0;
       for (const meta of Object.values(allRemote)) {
-        if (!meta?.localKey || knownKeys.has(meta.localKey)) continue;
+        if (!meta?.localKey || !meta?.downloadURL) continue;
+
+        const existingItem = byLocalKey[meta.localKey];
+
+        if (existingItem) {
+          // Item already in IndexedDB — backfill downloadURL if missing
+          // (items synced before the downloadURL fix won't have it)
+          if (!existingItem.downloadURL) {
+            existingItem.downloadURL = meta.downloadURL;
+            await idbPut(STORE_MEDIA, existingItem);
+          }
+          continue;
+        }
+
+        // Brand new item — download blob from Cloudinary and store
         try {
           const resp = await fetch(meta.downloadURL);
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -857,12 +880,12 @@ window.Dump = (() => {
             type:        meta.type,
             localKey:    meta.localKey,
             data:        blob,
-            downloadURL: meta.downloadURL, // store so AI can use it directly
+            downloadURL: meta.downloadURL,
             filename:    meta.filename,
             mimeType:    meta.mimeType,
             timestamp:   meta.timestamp,
           });
-          knownKeys.add(meta.localKey);
+          byLocalKey[meta.localKey] = { localKey: meta.localKey };
           added++;
         } catch (e) {
           console.warn('Media sync: failed to download item', meta.localKey, e);
