@@ -472,20 +472,52 @@ window.Dump = (() => {
 
   async function startReveal() {
     // Guard: ignore accidental clicks within 800ms of the reveal becoming available
-    // (prevents click-through from the auth screen transition on first login)
     if (Date.now() < revealEnabledAt) return;
+
+    const weekKey = App.getWeekKey();
+    const allMedia = await getWeekMedia(weekKey);
+    const grouped  = groupByMember(allMedia);
+
+    // ── Pre-generate all AI summaries before opening ──────────
+    // This way every card shows its summary instantly — no spinners during the reveal.
+    if (window.AI) {
+      const hasMembersWithMedia = CONFIG.APP.MEMBERS.some(m => (grouped[m] || []).length > 0);
+      if (hasMembersWithMedia) {
+        // Show loading state on whichever reveal buttons are visible
+        const revealBtns = ['home-start-reveal-btn', 'dump-start-reveal-btn']
+          .map(id => document.getElementById(id)).filter(Boolean);
+
+        revealBtns.forEach(btn => {
+          btn.dataset.origHtml = btn.innerHTML;
+          btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:8px;border-color:rgba(255,255,255,0.3);border-top-color:white;"></span> Preparing reveal…';
+          btn.style.pointerEvents = 'none';
+          btn.style.opacity = '0.8';
+        });
+
+        const membersWithMedia = CONFIG.APP.MEMBERS.filter(m => (grouped[m] || []).length > 0);
+        const total = membersWithMedia.length + 1;
+
+        await AI.generateAllSummaries(weekKey, grouped, (done, _total) => {
+          revealBtns.forEach(btn => {
+            btn.innerHTML = `<span class="spinner" style="width:16px;height:16px;display:inline-block;vertical-align:middle;margin-right:8px;border-color:rgba(255,255,255,0.3);border-top-color:white;"></span> Preparing… ${done}/${total}`;
+          });
+        });
+
+        revealBtns.forEach(btn => {
+          btn.innerHTML = btn.dataset.origHtml || '🎬 Start the Weekly Reveal';
+          btn.style.pointerEvents = '';
+          btn.style.opacity = '';
+        });
+      }
+    }
+
     vibrate([10, 50, 10]);
     const overlay = document.getElementById('reveal-overlay');
     overlay.classList.remove('hidden');
 
     // Start music
-    const weekKey = App.getWeekKey();
     const songFile = await Music.startReveal(weekKey);
     updateMusicUI(songFile);
-
-    // Load all media for this week
-    const allMedia = await getWeekMedia(weekKey);
-    const grouped  = groupByMember(allMedia);
 
     // Build card data
     const cards = buildRevealCards(weekKey, allMedia, grouped);
@@ -702,11 +734,11 @@ window.Dump = (() => {
     if (!el) return;
     try {
       const result = await AI.generateMemberSummary(weekKey, card.member, card.items);
-      el.innerHTML = result.summary || 'Had a great week! 🌟';
+      el.innerHTML = result?.summary || `${card.member} had a great week! 🌟`;
     } catch (e) {
       el.innerHTML = e.message.includes('not configured')
-        ? `<em style="opacity:0.6;font-size:13px;">Add Anthropic API key to config.js for AI summaries</em>`
-        : `Had an amazing week with the family! 🌟`;
+        ? `<em style="opacity:0.6;font-size:13px;">Add your OpenAI API key in the setup screen for AI summaries.</em>`
+        : `${card.member} had a great week with the family! 🌟`;
     }
   }
 
@@ -715,9 +747,10 @@ window.Dump = (() => {
     if (!el) return;
     try {
       const result = await AI.pickFamilyMoment(weekKey, grouped);
-      el.innerHTML = result.explanation || 'A wonderful week of family memories 💙';
+      // explanation may be null if generation failed — show generic only as last resort
+      el.innerHTML = result?.explanation || 'A week full of real moments from the people who matter most. 💙';
     } catch (e) {
-      el.innerHTML = 'Another beautiful week of memories shared by the Riley family. 💙';
+      el.innerHTML = 'A week full of real moments from the people who matter most. 💙';
     }
   }
 
