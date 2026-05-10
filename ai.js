@@ -2,9 +2,12 @@
 // Riley Family — AI Module (OpenAI API)
 // Generates member summaries and picks the Family Moment.
 //
+// Images are passed to OpenAI as Cloudinary URLs (not base64)
+// so HEIC/HEIF photos from iPhones work correctly — Cloudinary
+// auto-converts them to JPEG that OpenAI can fetch directly.
+//
 // Summaries are pre-generated before the reveal opens, then
-// saved to Firebase so every device reads the same result —
-// no API key needed on family members' devices.
+// saved to Firebase so every device reads the same result.
 // ============================================================
 
 window.AI = (() => {
@@ -43,10 +46,28 @@ window.AI = (() => {
     try { await Sync.set(`${FIREBASE_PATH}/${weekKey}/${member}`, data); } catch {}
   }
 
-  // ── Image resize — shrink photos before sending to OpenAI ─
-  // Full-res blobs can be 3–8 MB each; resizing to 800px keeps
-  // the request under ~200 KB per image without losing detail.
+  // ── Build image content for a media item ─────────────────
+  // Prefers Cloudinary URL (works with HEIC/HEIF, no base64 overhead).
+  // Falls back to blob → canvas resize → base64 JPEG for local-only items.
 
+  async function imageContentForItem(item) {
+    // 1. Cloudinary URL available — use it directly
+    if (item.downloadURL) {
+      return { type: 'image_url', image_url: { url: item.downloadURL, detail: 'low' } };
+    }
+
+    // 2. Local blob — resize to JPEG via canvas (may fail for HEIC on some browsers)
+    if (item.data instanceof Blob) {
+      try {
+        const dataURL = await resizeBlob(item.data, 800);
+        if (dataURL) return { type: 'image_url', image_url: { url: dataURL, detail: 'low' } };
+      } catch {}
+    }
+
+    return null; // couldn't get an image
+  }
+
+  // Resize a blob to max maxPx on longest side, return JPEG base64 data URL.
   async function resizeBlob(blob, maxPx = 800) {
     return new Promise((resolve) => {
       const img = new Image();
@@ -107,7 +128,7 @@ window.AI = (() => {
     const local = getLsCache(weekKey, member);
     if (local) return local;
 
-    // 2. Firebase cache (another device may have already generated it)
+    // 2. Firebase — another device may have already generated it
     const remote = await getRemote(weekKey, member);
     if (remote) {
       setLsCache(weekKey, member, remote);
@@ -121,14 +142,12 @@ window.AI = (() => {
     const videos = mediaItems.filter(m => m.type === 'video');
     const voices = mediaItems.filter(m => m.type === 'voice');
 
-    // Resize up to 5 photos and include as vision content
+    // Build vision content — up to 5 photos (Cloudinary URL preferred)
     const content = [];
     const photoLimit = Math.min(photos.length, 5);
     for (let i = 0; i < photoLimit; i++) {
-      try {
-        const dataURL = await resizeBlob(photos[i].data, 800);
-        if (dataURL) content.push({ type: 'image_url', image_url: { url: dataURL, detail: 'low' } });
-      } catch {}
+      const imgContent = await imageContentForItem(photos[i]);
+      if (imgContent) content.push(imgContent);
     }
 
     const mediaDesc = [
@@ -137,26 +156,33 @@ window.AI = (() => {
       voices.length > 0 ? `${voices.length} voice recording${voices.length > 1 ? 's' : ''}` : '',
     ].filter(Boolean).join(', ');
 
-    const textPrompt = `Family member: ${member}
-Shared this week: ${mediaDesc}
+    const hasImages = content.length > 0;
 
-Study the photos carefully. Write a 3–4 sentence personal recap of ${member}'s week.
+    const textPrompt = hasImages
+      ? `Family member: ${member}. They shared ${mediaDesc} this week.
+
+Study the photos above carefully. Write a 3–4 sentence personal recap.
 Rules:
-- Start with "${member}" by name
-- Describe what you ACTUALLY SEE in the images — specific food, places, activities, objects, expressions
-- If you see a meal, name it. If you see a location, describe it. If you see an activity, describe exactly what's happening.
-- Do NOT use generic phrases like "amazing week", "great memories", or "quality time"
-- Each sentence must reference something literally visible in the photos
-Output ONLY the recap sentences, nothing else.`;
+- Start with "${member}" by name (e.g. "${member} spent time…" or "${member} was spotted…")
+- Describe SPECIFIC things you can see: exact food, places, clothing, expressions, objects, settings
+- If you see a meal, name it. If you see a place, describe it. If you see an activity, be precise.
+- Do NOT use phrases like "amazing week", "quality time", "great memories", "cherished moments"
+- Each sentence must describe something literally visible in the photos
+Output ONLY the recap sentences.`
+      : `Family member: ${member}. They shared ${mediaDesc} this week.
+
+Write a warm 2–3 sentence personal recap about ${member}'s week.
+Start with "${member}" by name. Be warm and specific to this family member's personality and role.
+Output ONLY the recap sentences.`;
 
     content.push({ type: 'text', text: textPrompt });
 
     const systemPrompt = `You write warm, specific weekly recaps for the Riley Family photo dump app.
-Your recaps are grounded in what is literally visible in the photos — real food, real places, real activities.
-Never be generic. Every sentence should describe something a viewer can actually see in the images.`;
+When photos are provided, every sentence must reference something literally visible in the images.
+Be vivid and personal. Never use generic filler phrases.`;
 
     const summary = await callOpenAI(
-      [{ role: 'user', content: content.length > 1 ? content : textPrompt }],
+      [{ role: 'user', content: hasImages ? content : textPrompt }],
       systemPrompt
     );
 
@@ -190,40 +216,48 @@ Never be generic. Every sentence should describe something a viewer can actually
       const photos = items.filter(m => m.type === 'photo');
       if (photos.length === 0) continue;
       photosByMember.push({ member, count: photos.length });
-      // Up to 2 resized photos per member
+      // Up to 2 photos per member
       for (let i = 0; i < Math.min(2, photos.length); i++) {
-        try {
-          const dataURL = await resizeBlob(photos[i].data, 800);
-          if (dataURL) content.push({ type: 'image_url', image_url: { url: dataURL, detail: 'low' } });
-        } catch {}
+        const imgContent = await imageContentForItem(photos[i]);
+        if (imgContent) content.push(imgContent);
       }
     }
 
-    const membersDesc = photosByMember.map(p => `${p.member} (${p.count} photo${p.count > 1 ? 's' : ''})`).join(', ');
+    const membersDesc = photosByMember
+      .map(p => `${p.member} (${p.count} photo${p.count > 1 ? 's' : ''})`)
+      .join(', ');
 
-    content.push({
-      type: 'text',
-      text: `Photos this week from: ${membersDesc}.
+    const hasImages = content.length > 0;
 
-Look at ALL the photos above. Pick the single most memorable, funny, or heartwarming one.
-Write 2–3 sentences about it:
-1. Describe exactly what is happening in the photo (who, what, where — be specific)
-2. Explain why this moment stands out this week
-Start by describing what is literally visible. Do NOT be generic. Output ONLY the sentences.`,
-    });
+    const textPrompt = hasImages
+      ? `Photos this week from: ${membersDesc}.
+
+Look at ALL photos above. Pick the single most memorable, funny, or heartwarming one.
+Write 2–3 sentences:
+1. Describe exactly what is happening: who, what, where — be specific about what you see
+2. Say why this moment stands out this week
+Do NOT be generic. Start by describing what is literally in the photo.
+Output ONLY the description sentences.`
+      : `The Riley Family shared memories this week from: ${membersDesc}.
+Write 2–3 warm sentences celebrating this week as a family standout moment. Be specific and heartfelt.
+Output ONLY the sentences.`;
+
+    content.push({ type: 'text', text: textPrompt });
 
     const systemPrompt = `You pick the single best photo moment from the Riley Family's week.
-Be specific: name the person, describe the scene, mention real details you can see.
-Never use generic language. Make the family feel like you actually looked at their photos.`;
+Name the person, describe the scene, mention real details visible in the photo.
+Never be generic. Make the family feel like you actually looked at their specific photos.`;
 
     let explanation = null;
     try {
       explanation = await callOpenAI(
-        [{ role: 'user', content: content.length > 1 ? content : (content[0]?.text || '') }],
+        [{ role: 'user', content: hasImages ? content : textPrompt }],
         systemPrompt
       );
     } catch (e) {
-      console.warn('Family moment generation failed:', e);
+      console.warn('Family moment OpenAI call failed:', e.message);
+      // Don't save a null result — let other devices try
+      throw e;
     }
 
     const result = { explanation, generatedAt: Date.now() };
@@ -233,22 +267,32 @@ Never use generic language. Make the family feel like you actually looked at the
   }
 
   // ── Pre-generate ALL summaries before reveal opens ────────
-  // Runs member summaries + moment in parallel.
+  // Tries every member (not just those with local media) so Firebase
+  // summaries from other devices are always fetched.
   // onProgress(done, total) called as each completes.
 
   async function generateAllSummaries(weekKey, groupedMedia, onProgress) {
-    const members = CONFIG.APP.MEMBERS.filter(m => (groupedMedia[m] || []).length > 0);
+    // Always try all members — those without local media still check Firebase
+    const members = CONFIG.APP.MEMBERS;
     let done = 0;
     const total = members.length + 1; // members + moment
 
     await Promise.all([
       ...members.map(async (member) => {
-        try { await generateMemberSummary(weekKey, member, groupedMedia[member] || []); } catch {}
+        try {
+          await generateMemberSummary(weekKey, member, groupedMedia[member] || []);
+        } catch (e) {
+          console.warn(`Summary for ${member} failed:`, e.message);
+        }
         done++;
         if (onProgress) onProgress(done, total);
       }),
       (async () => {
-        try { await pickFamilyMoment(weekKey, groupedMedia); } catch {}
+        try {
+          await pickFamilyMoment(weekKey, groupedMedia);
+        } catch (e) {
+          console.warn('Moment generation failed:', e.message);
+        }
         done++;
         if (onProgress) onProgress(done, total);
       })(),

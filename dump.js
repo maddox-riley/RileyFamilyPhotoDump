@@ -151,7 +151,9 @@ window.Dump = (() => {
       mimeType: mimeType || blob.type,
       timestamp: Date.now(),
     };
-    await idbPut(STORE_MEDIA, item);
+    // Capture the auto-generated id so we can update the record later
+    const itemId = await idbPut(STORE_MEDIA, item);
+    item.id = itemId;
     vibrate(10);
 
     // Upload to Cloudinary + write metadata to Firebase so all other devices get it
@@ -165,6 +167,9 @@ window.Dump = (() => {
             mimeType: item.mimeType,
             timestamp: item.timestamp,
           });
+          // Update local idb record with downloadURL so AI can use it directly
+          item.downloadURL = downloadURL;
+          await idbPut(STORE_MEDIA, item);
           console.log('Media synced ✓', localKey);
         } catch (e) {
           console.warn('Media sync upload failed:', e);
@@ -848,13 +853,14 @@ window.Dump = (() => {
           const blob = await resp.blob();
           await idbPut(STORE_MEDIA, {
             weekKey,
-            uploader:  meta.uploader,
-            type:      meta.type,
-            localKey:  meta.localKey,
-            data:      blob,
-            filename:  meta.filename,
-            mimeType:  meta.mimeType,
-            timestamp: meta.timestamp,
+            uploader:    meta.uploader,
+            type:        meta.type,
+            localKey:    meta.localKey,
+            data:        blob,
+            downloadURL: meta.downloadURL, // store so AI can use it directly
+            filename:    meta.filename,
+            mimeType:    meta.mimeType,
+            timestamp:   meta.timestamp,
           });
           knownKeys.add(meta.localKey);
           added++;

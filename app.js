@@ -235,6 +235,14 @@ window.App = (() => {
       closeDevModal();
       Setup.openSetupScreen();
     });
+
+    // ── Regenerate AI summaries ───────────────────────────────
+    document.getElementById('dev-regen-ai-btn')?.addEventListener('click', async () => {
+      if (!confirm('Clear cached AI summaries for this week? Fresh ones will be generated next time you start the reveal (requires OpenAI key on this device).')) return;
+      if (window.AI) AI.clearWeekCache(getWeekKey());
+      closeDevModal();
+      Tracker.showInAppAlert('Summaries cleared', 'Fresh AI summaries will be generated when you next start the reveal.');
+    });
   }
 
   // ── Long-press on title → Developer modal ─────────────────
