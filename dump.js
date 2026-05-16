@@ -142,6 +142,15 @@ window.Dump = (() => {
     await openDB();
     const weekKey  = App.getWeekKey();
     const uploader = App.getCurrentMember();
+
+    // Block duplicate uploads: same uploader + same filename this week
+    if (filename) {
+      const existing = await getWeekMedia(weekKey);
+      if (existing.some(m => m.uploader === uploader && m.filename === filename)) {
+        console.warn('Duplicate upload skipped:', filename);
+        return;
+      }
+    }
     // Unique key so other devices can deduplicate on sync
     const localKey = `${uploader}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     const item = {
@@ -189,16 +198,24 @@ window.Dump = (() => {
     await refreshHomeStats();
   }
 
-  // ── Get all media for week (deduplicated by localKey) ────
+  // ── Get all media for week (deduplicated) ────────────────
   async function getWeekMedia(weekKey) {
     await openDB();
     const items = await idbGetAllByIndex(STORE_MEDIA, 'weekKey', weekKey);
-    // Guard against duplicate IndexedDB entries (same localKey stored twice)
-    const seen = new Set();
+    // Deduplicate by localKey (same idb record stored twice)
+    // AND by uploader+filename (same photo selected twice from camera roll)
+    const seenKeys      = new Set();
+    const seenFilenames = new Set();
     return items.filter(item => {
-      if (!item.localKey) return true;
-      if (seen.has(item.localKey)) return false;
-      seen.add(item.localKey);
+      if (item.localKey) {
+        if (seenKeys.has(item.localKey)) return false;
+        seenKeys.add(item.localKey);
+      }
+      if (item.filename && item.uploader) {
+        const fk = `${item.uploader}::${item.filename}`;
+        if (seenFilenames.has(fk)) return false;
+        seenFilenames.add(fk);
+      }
       return true;
     });
   }
