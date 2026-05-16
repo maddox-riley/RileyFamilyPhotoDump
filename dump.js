@@ -189,10 +189,18 @@ window.Dump = (() => {
     await refreshHomeStats();
   }
 
-  // ── Get all media for week ────────────────────────────────
+  // ── Get all media for week (deduplicated by localKey) ────
   async function getWeekMedia(weekKey) {
     await openDB();
-    return idbGetAllByIndex(STORE_MEDIA, 'weekKey', weekKey);
+    const items = await idbGetAllByIndex(STORE_MEDIA, 'weekKey', weekKey);
+    // Guard against duplicate IndexedDB entries (same localKey stored twice)
+    const seen = new Set();
+    return items.filter(item => {
+      if (!item.localKey) return true;
+      if (seen.has(item.localKey)) return false;
+      seen.add(item.localKey);
+      return true;
+    });
   }
 
   async function getMyMedia(weekKey) {
@@ -901,8 +909,24 @@ window.Dump = (() => {
   // ── Init ──────────────────────────────────────────────────
   async function init() {
     await openDB();
+    const weekKey = App.getWeekKey();
+
     // Subscribe to cross-device media sync for this week
-    subscribeMediaSync(App.getWeekKey());
+    subscribeMediaSync(weekKey);
+
+    // Subscribe to clear-media signal from dev modal
+    if (window.Sync && Sync.isConfigured()) {
+      Sync.subscribe('config/clearMedia', async (data) => {
+        if (!data?.weekKey || data.weekKey !== weekKey) return;
+        // Avoid re-processing the same clear event
+        const processedKey = `riley_clearMedia_${data.weekKey}`;
+        const lastCleared = parseInt(localStorage.getItem(processedKey) || '0');
+        if (data.clearedAt <= lastCleared) return;
+        localStorage.setItem(processedKey, String(data.clearedAt));
+        await clearWeekMediaLocal(data.weekKey);
+      });
+    }
+
     await refreshDumpUI();
     startCountdown();
     wireRevealInteractions();
@@ -964,15 +988,27 @@ window.Dump = (() => {
 
   // ── Developer utilities ───────────────────────────────────
 
-  async function clearWeekMedia() {
+  // Clear media locally on this device only
+  async function clearWeekMediaLocal(weekKey) {
     await openDB();
-    const weekKey = App.getWeekKey();
     const items = await idbGetAllByIndex(STORE_MEDIA, 'weekKey', weekKey);
     for (const item of items) {
       await idbDelete(STORE_MEDIA, item.id);
     }
     await refreshDumpUI();
     await refreshHomeStats();
+  }
+
+  // Clear media on ALL devices by writing a signal to Firebase
+  async function clearWeekMedia() {
+    const weekKey = App.getWeekKey();
+    await clearWeekMediaLocal(weekKey);
+    // Signal all other devices to clear too
+    if (window.Sync && Sync.isConfigured()) {
+      await Sync.set('config/clearMedia', { weekKey, clearedAt: Date.now() });
+    }
+    // Also clear AI summary cache for this week
+    if (window.AI) AI.clearWeekCache(weekKey);
   }
 
   function forceReveal() {

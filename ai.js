@@ -124,13 +124,13 @@ window.AI = (() => {
   // Cache order: localStorage → Firebase → OpenAI
 
   async function generateMemberSummary(weekKey, member, mediaItems) {
-    // 1. Local cache (instant)
+    // 1. Local cache — only use if it has valid content (not a stale failed result)
     const local = getLsCache(weekKey, member);
-    if (local) return local;
+    if (local?.summary) return local;
 
     // 2. Firebase — another device may have already generated it
     const remote = await getRemote(weekKey, member);
-    if (remote) {
+    if (remote?.summary) {
       setLsCache(weekKey, member, remote);
       return remote;
     }
@@ -195,13 +195,19 @@ Be vivid and personal. Never use generic filler phrases.`;
   // ── Pick Family Moment of the Week ───────────────────────
 
   async function pickFamilyMoment(weekKey, allMediaByMember) {
-    // 1. Local cache
+    // 1. Local cache — only use if it has valid content (skip stale null results)
     const localRaw = localStorage.getItem(momentLsKey(weekKey));
-    if (localRaw) { try { return JSON.parse(localRaw); } catch {} }
+    if (localRaw) {
+      try {
+        const parsed = JSON.parse(localRaw);
+        if (parsed?.explanation) return parsed;
+        // explanation is null = old failed attempt; fall through to Firebase
+      } catch {}
+    }
 
     // 2. Firebase cache
     const remote = await getRemote(weekKey, '_MOMENT');
-    if (remote) {
+    if (remote?.explanation) {
       localStorage.setItem(momentLsKey(weekKey), JSON.stringify(remote));
       return remote;
     }
@@ -232,33 +238,28 @@ Be vivid and personal. Never use generic filler phrases.`;
     const textPrompt = hasImages
       ? `Photos this week from: ${membersDesc}.
 
-Look at ALL photos above. Pick the single most memorable, funny, or heartwarming one.
-Write 2–3 sentences:
-1. Describe exactly what is happening: who, what, where — be specific about what you see
-2. Say why this moment stands out this week
-Do NOT be generic. Start by describing what is literally in the photo.
-Output ONLY the description sentences.`
-      : `The Riley Family shared memories this week from: ${membersDesc}.
-Write 2–3 warm sentences celebrating this week as a family standout moment. Be specific and heartfelt.
-Output ONLY the sentences.`;
+Look at ALL the photos. Pick the single best one — the most fun, heartwarming, or interesting.
+Write ONE short photo caption (max 12 words) that describes exactly what you see.
+Format: just like an Instagram caption — specific, vivid, no fluff.
+Examples: "Maddox's team huddling before the big game ⚽" or "Dad's giant dessert at The Yard 🍨"
+Output ONLY the caption. Nothing else.`
+      : `The Riley Family shared memories this week: ${membersDesc}.
+Write one short, warm caption (max 12 words) for the standout family moment.
+Output ONLY the caption.`;
 
     content.push({ type: 'text', text: textPrompt });
 
-    const systemPrompt = `You pick the single best photo moment from the Riley Family's week.
-Name the person, describe the scene, mention real details visible in the photo.
-Never be generic. Make the family feel like you actually looked at their specific photos.`;
+    const systemPrompt = `You write short, specific photo captions for the Riley Family's weekly photo dump.
+Pick the single best photo and describe exactly what you see in 12 words or fewer.
+Be vivid and specific. Never be generic. Output only the caption — no preamble.`;
 
-    let explanation = null;
-    try {
-      explanation = await callOpenAI(
-        [{ role: 'user', content: hasImages ? content : textPrompt }],
-        systemPrompt
-      );
-    } catch (e) {
-      console.warn('Family moment OpenAI call failed:', e.message);
-      // Don't save a null result — let other devices try
-      throw e;
-    }
+    // If OpenAI fails, throw so other devices can try — never save a null result
+    const explanation = await callOpenAI(
+      [{ role: 'user', content: hasImages ? content : textPrompt }],
+      systemPrompt
+    );
+
+    if (!explanation) throw new Error('OpenAI returned empty response');
 
     const result = { explanation, generatedAt: Date.now() };
     localStorage.setItem(momentLsKey(weekKey), JSON.stringify(result));
