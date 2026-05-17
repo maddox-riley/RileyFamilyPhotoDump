@@ -22,6 +22,18 @@ window.Flight = (() => {
     return !!(CONFIG.RAPIDAPI_KEY && CONFIG.RAPIDAPI_KEY !== 'YOUR_RAPIDAPI_KEY_HERE');
   }
 
+  // Returns the ISO date string for the next occurrence of dayOfWeek (0=Sun…6=Sat).
+  // If today IS that day, returns today.
+  function nextDateForDay(dayOfWeek) {
+    const now   = new Date();
+    const today = now.getDay();
+    let ahead   = dayOfWeek - today;
+    if (ahead < 0) ahead += 7;
+    const d = new Date(now);
+    d.setDate(now.getDate() + ahead);
+    return d.toISOString().split('T')[0];
+  }
+
   // ── Flight number storage (cross-device via Firebase) ─────
   function saveFlightNumbers(monFlight, friFlight) {
     const data = {
@@ -63,11 +75,12 @@ window.Flight = (() => {
   }
 
   // ── API fetch ─────────────────────────────────────────────
-  async function fetchFlightData(flightNumber) {
+  // date: optional ISO date string (YYYY-MM-DD). Defaults to today.
+  async function fetchFlightData(flightNumber, date) {
     if (!hasApiKey()) throw new Error('RapidAPI key not configured.');
 
-    const today = new Date().toISOString().split('T')[0];
-    const url   = `https://aerodatabox.p.rapidapi.com/flights/number/${encodeURIComponent(flightNumber)}/${today}`;
+    const queryDate = date || new Date().toISOString().split('T')[0];
+    const url   = `https://aerodatabox.p.rapidapi.com/flights/number/${encodeURIComponent(flightNumber)}/${queryDate}`;
 
     const resp = await fetch(url, {
       method: 'GET',
@@ -309,10 +322,12 @@ window.Flight = (() => {
   }
 
   // ── Track a flight and render into container ──────────────
+  // date: optional ISO date string for the API query (Dad's device only).
+  //       Pass the actual flight date so non-flight-day queries work.
   // Dad's device: fetches from API → pushes to Firebase → auto-refreshes.
   // Family devices: reads from Firebase → subscribes for live updates.
 
-  async function trackFlight(flightNumber, label, containerEl) {
+  async function trackFlight(flightNumber, label, containerEl, date) {
     if (!flightNumber) return;
 
     const path = fbDataPath(flightNumber);
@@ -336,7 +351,7 @@ window.Flight = (() => {
         </div>`;
 
       try {
-        const flight = await fetchFlightData(flightNumber); // pushes to Firebase inside
+        const flight = await fetchFlightData(flightNumber, date); // pushes to Firebase inside
         if (containerEl.isConnected) containerEl.innerHTML = renderFlightCard(flight, label);
 
         if (['scheduled', 'boarding', 'in-air', 'delayed'].includes(flight.status)) {
@@ -368,10 +383,13 @@ window.Flight = (() => {
       if (cached) {
         if (containerEl.isConnected) containerEl.innerHTML = renderFlightCard(cached, label);
       } else {
+        // Show the flight number with a friendly "scheduled" note rather than
+        // a generic waiting message — the number is already saved and confirmed.
         if (containerEl.isConnected) {
+          const dayName  = label.split(' ')[0]; // "Monday" or "Friday"
           containerEl.innerHTML = `
             <div style="font-size:14px;color:var(--text-secondary);text-align:center;padding:16px 0;">
-              ✈️ Waiting for Dad to track his flight…
+              ✈️ <strong>${flightNumber}</strong> is saved — live tracking starts ${dayName}.
             </div>`;
         }
       }
@@ -379,9 +397,9 @@ window.Flight = (() => {
   }
 
   // ── Auto-show the right flight on every device, every day ─
-  // On a flight day show today's flight. Any other day, show
-  // whichever flight has data saved (so family can see Dad's
-  // status mid-week or preview the upcoming flight).
+  // On the actual flight day use today's date for the API query.
+  // On any other day, pass the next occurrence of that flight day
+  // so Dad's device fetches scheduled info for the right date.
 
   function autoTrackSavedFlights(flightNumbers) {
     const area = document.getElementById('flight-status-area');
@@ -392,14 +410,16 @@ window.Flight = (() => {
     const friNum = flightNumbers?.friday;
 
     if (today === 1 && monNum) {
+      // It's Monday — track with today's date
       trackFlight(monNum, 'Monday — Charlotte → Dallas', area);
     } else if (today === 5 && friNum) {
+      // It's Friday — track with today's date
       trackFlight(friNum, 'Friday — Dallas → Charlotte', area);
-    } else if (monNum || friNum) {
-      // Not a flight day — show whichever flight has data in Firebase
-      const num   = monNum || friNum;
-      const label = monNum ? 'Monday — Charlotte → Dallas' : 'Friday — Dallas → Charlotte';
-      trackFlight(num, label, area);
+    } else if (monNum) {
+      // Not Mon/Fri — fetch for next Monday so Dad can push scheduled info
+      trackFlight(monNum, 'Monday — Charlotte → Dallas', area, nextDateForDay(1));
+    } else if (friNum) {
+      trackFlight(friNum, 'Friday — Dallas → Charlotte', area, nextDateForDay(5));
     }
   }
 
@@ -442,13 +462,14 @@ window.Flight = (() => {
       });
     }
 
-    // Wire save/track buttons
+    // Wire save/track buttons — pass the correct flight date so the API
+    // query targets the right day even when Save is clicked in advance.
     document.getElementById('track-monday-btn')?.addEventListener('click', () => {
       const num = monInput?.value?.trim().toUpperCase();
       if (!num) return;
       saveFlightNumbers(num, friInput?.value?.trim().toUpperCase() || '');
       const area = document.getElementById('flight-status-area');
-      if (area) trackFlight(num, 'Monday — Charlotte → Dallas', area);
+      if (area) trackFlight(num, 'Monday — Charlotte → Dallas', area, nextDateForDay(1));
     });
 
     document.getElementById('track-friday-btn')?.addEventListener('click', () => {
@@ -456,7 +477,7 @@ window.Flight = (() => {
       if (!num) return;
       saveFlightNumbers(monInput?.value?.trim().toUpperCase() || '', num);
       const area = document.getElementById('flight-status-area');
-      if (area) trackFlight(num, 'Friday — Dallas → Charlotte', area);
+      if (area) trackFlight(num, 'Friday — Dallas → Charlotte', area, nextDateForDay(5));
     });
 
     // Auto-show on load for every device, every profile, every day of the week
