@@ -425,9 +425,14 @@ window.Flight = (() => {
 
     // Subscribe to flight number changes (cross-device).
     // When Dad saves a flight on one device it instantly appears everywhere.
+    // When Dad clears tracking the data is null — clear UI on all devices.
     if (window.Sync) {
       Sync.subscribe('flights/' + weekKey, (data) => {
-        if (!data) return;
+        if (!data) {
+          // Tracking was cleared — wipe UI on this device too
+          clearFlightUI();
+          return;
+        }
         localStorage.setItem(getStorageKey(), JSON.stringify(data));
         if (monInput && data.monday) monInput.value = data.monday;
         if (friInput && data.friday) friInput.value = data.friday;
@@ -458,7 +463,52 @@ window.Flight = (() => {
     autoTrackSavedFlights(saved);
   }
 
+  // ── Clear flight UI on this device ───────────────────────
+  function clearFlightUI() {
+    const monInput   = document.getElementById('monday-flight-input');
+    const friInput   = document.getElementById('friday-flight-input');
+    const area       = document.getElementById('flight-status-area');
+    const familyView = document.getElementById('dad-flight-family-view');
+    const ind        = document.getElementById('flight-refresh-indicator');
+
+    if (monInput)   monInput.value   = '';
+    if (friInput)   friInput.value   = '';
+    if (area)       area.innerHTML   = '';
+    if (familyView) familyView.innerHTML = '';
+    if (ind)        ind.textContent  = '';
+  }
+
+  // ── Clear all flight tracking (dev tool) ──────────────────
+  // Removes flight numbers + data from localStorage, local caches,
+  // and Firebase so no tracking is visible on any device.
+
+  async function clearFlightTracking() {
+    const weekKey = getWeekKey();
+    const saved   = loadFlightNumbers();
+
+    // Stop any running auto-refresh timers
+    Object.keys(refreshTimers).forEach(k => stopAutoRefresh(k));
+
+    // Clear local flight number storage
+    localStorage.removeItem(getStorageKey());
+
+    // Clear local flight data caches
+    [saved.monday, saved.friday].filter(Boolean).forEach(num => {
+      localStorage.removeItem(`riley_fdc_${num}`);
+    });
+
+    // Clear Firebase — removing flights/{weekKey} triggers the subscription
+    // on every device, which calls clearFlightUI() via the null handler above
+    if (window.Sync && Sync.isConfigured()) {
+      await Sync.remove(`flightData/${weekKey}`);
+      await Sync.remove(`flights/${weekKey}`);
+    }
+
+    // Clear UI on this device immediately (don't wait for subscription)
+    clearFlightUI();
+  }
+
   // ── Public API ────────────────────────────────────────────
-  return { init, trackFlight, loadFlightNumbers, saveFlightNumbers };
+  return { init, trackFlight, loadFlightNumbers, saveFlightNumbers, clearFlightTracking };
 
 })();

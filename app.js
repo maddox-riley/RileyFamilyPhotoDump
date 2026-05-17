@@ -236,6 +236,14 @@ window.App = (() => {
       Setup.openSetupScreen();
     });
 
+    // ── Clear flight tracking ─────────────────────────────────
+    document.getElementById('dev-clear-flights-btn')?.addEventListener('click', async () => {
+      if (!confirm('Clear all flight tracking on every device? Dad will need to re-enter flight numbers.')) return;
+      await Flight.clearFlightTracking();
+      closeDevModal();
+      Tracker.showInAppAlert('Flights cleared', 'Flight tracking removed from all devices.');
+    });
+
     // ── Regenerate AI summaries ───────────────────────────────
     document.getElementById('dev-regen-ai-btn')?.addEventListener('click', async () => {
       if (!confirm('Clear cached AI summaries for this week? Fresh ones will be generated next time you start the reveal (requires OpenAI key on this device).')) return;
