@@ -362,6 +362,31 @@ window.Flight = (() => {
     }
   }
 
+  // ── Auto-show the right flight on every device, every day ─
+  // On a flight day show today's flight. Any other day, show
+  // whichever flight has data saved (so family can see Dad's
+  // status mid-week or preview the upcoming flight).
+
+  function autoTrackSavedFlights(flightNumbers) {
+    const area = document.getElementById('flight-status-area');
+    if (!area) return;
+
+    const today  = new Date().getDay();
+    const monNum = flightNumbers?.monday;
+    const friNum = flightNumbers?.friday;
+
+    if (today === 1 && monNum) {
+      trackFlight(monNum, 'Monday — Charlotte → Dallas', area);
+    } else if (today === 5 && friNum) {
+      trackFlight(friNum, 'Friday — Dallas → Charlotte', area);
+    } else if (monNum || friNum) {
+      // Not a flight day — show whichever flight has data in Firebase
+      const num   = monNum || friNum;
+      const label = monNum ? 'Monday — Charlotte → Dallas' : 'Friday — Dallas → Charlotte';
+      trackFlight(num, label, area);
+    }
+  }
+
   // ── Init ──────────────────────────────────────────────────
   function init() {
     const saved    = loadFlightNumbers();
@@ -372,7 +397,8 @@ window.Flight = (() => {
     if (monInput && saved.monday) monInput.value = saved.monday;
     if (friInput && saved.friday) friInput.value = saved.friday;
 
-    // Subscribe to flight number changes (cross-device)
+    // Subscribe to flight number changes (cross-device).
+    // When Dad saves a flight on one device it instantly appears everywhere.
     if (window.Sync) {
       Sync.subscribe('flights/' + weekKey, (data) => {
         if (!data) return;
@@ -380,6 +406,8 @@ window.Flight = (() => {
         if (monInput && data.monday) monInput.value = data.monday;
         if (friInput && data.friday) friInput.value = data.friday;
         if (window.Tracker) Tracker.applyDadMode();
+        // Show the flight immediately on this device without any manual action
+        autoTrackSavedFlights(data);
       });
     }
 
@@ -400,16 +428,8 @@ window.Flight = (() => {
       if (area) trackFlight(num, 'Friday — Dallas → Charlotte', area);
     });
 
-    // Auto-track today's flight if numbers are saved
-    const area = document.getElementById('flight-status-area');
-    if (area && (saved.monday || saved.friday)) {
-      const today = new Date().getDay();
-      if (today === 1 && saved.monday) {
-        trackFlight(saved.monday, 'Monday — Charlotte → Dallas', area);
-      } else if (today === 5 && saved.friday) {
-        trackFlight(saved.friday, 'Friday — Dallas → Charlotte', area);
-      }
-    }
+    // Auto-show on load for every device, every profile, every day of the week
+    autoTrackSavedFlights(saved);
   }
 
   // ── Public API ────────────────────────────────────────────
