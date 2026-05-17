@@ -303,24 +303,30 @@
           <!-- Flight status — always visible (read-only for family, editable for Dad) -->
           <div class="card">
             <div class="card-header">
-              <h3>This Week's Flights</h3>
+              <h3>Flight Tracker</h3>
               <span id="flight-refresh-indicator" style="font-size:11px;color:var(--text-secondary);"></span>
             </div>
             <!-- Dad-only: input fields -->
             <div id="dad-flight-inputs" style="display:none;flex-direction:column;gap:14px;margin-bottom:16px;">
               <div class="flight-input-row">
                 <div class="flight-input-wrap">
-                  <label for="monday-flight-input">Monday Departure</label>
-                  <input type="text" id="monday-flight-input" placeholder="e.g. WN1234" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+                  <label for="outbound-flight-input">Departure</label>
+                  <div style="display:flex;gap:8px;margin-top:4px;">
+                    <input type="text" id="outbound-flight-input" placeholder="e.g. AA704" style="flex:1;min-width:0;" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+                    <input type="date" id="outbound-flight-date" style="flex:1;min-width:0;" />
+                  </div>
                 </div>
-                <button class="track-btn" id="track-monday-btn">Save</button>
+                <button class="track-btn" id="track-outbound-btn">Save</button>
               </div>
               <div class="flight-input-row">
                 <div class="flight-input-wrap">
-                  <label for="friday-flight-input">Friday Return</label>
-                  <input type="text" id="friday-flight-input" placeholder="e.g. WN5678" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+                  <label for="return-flight-input">Return</label>
+                  <div style="display:flex;gap:8px;margin-top:4px;">
+                    <input type="text" id="return-flight-input" placeholder="e.g. WN5678" style="flex:1;min-width:0;" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+                    <input type="date" id="return-flight-date" style="flex:1;min-width:0;" />
+                  </div>
                 </div>
-                <button class="track-btn" id="track-friday-btn">Save</button>
+                <button class="track-btn" id="track-return-btn">Save</button>
               </div>
             </div>
             <!-- Family view: shows saved flights or a friendly message -->

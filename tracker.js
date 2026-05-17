@@ -240,24 +240,30 @@ window.Tracker = (() => {
     // Family view: show saved flight numbers when not Dad
     if (familyView) {
       if (!isDad) {
-        const saved   = Flight.loadFlightNumbers();
-        const hasMon  = !!saved.monday;
-        const hasFri  = !!saved.friday;
-        if (hasMon || hasFri) {
+        const saved    = Flight.loadFlightData ? Flight.loadFlightData() : {};
+        const outbound = saved.outbound;
+        const ret      = saved.return;
+        if (outbound || ret) {
           familyView.innerHTML = `
             <div style="display:flex;flex-direction:column;gap:8px;">
-              ${hasMon ? `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface-2);border-radius:var(--r-sm);">
+              ${outbound ? `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface-2);border-radius:var(--r-sm);">
                 <span style="font-size:20px;">✈️</span>
-                <div><div style="font-size:13px;color:var(--text-secondary);">Monday departure</div><div style="font-weight:700;">${saved.monday}</div></div>
+                <div>
+                  <div style="font-size:13px;color:var(--text-secondary);">Departure${outbound.date ? ' · ' + new Date(outbound.date + 'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : ''}</div>
+                  <div style="font-weight:700;">${outbound.num}</div>
+                </div>
               </div>` : ''}
-              ${hasFri ? `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface-2);border-radius:var(--r-sm);">
+              ${ret ? `<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface-2);border-radius:var(--r-sm);">
                 <span style="font-size:20px;">🏠</span>
-                <div><div style="font-size:13px;color:var(--text-secondary);">Friday return</div><div style="font-weight:700;">${saved.friday}</div></div>
+                <div>
+                  <div style="font-size:13px;color:var(--text-secondary);">Return${ret.date ? ' · ' + new Date(ret.date + 'T12:00:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}) : ''}</div>
+                  <div style="font-weight:700;">${ret.num}</div>
+                </div>
               </div>` : ''}
             </div>`;
         } else {
           familyView.innerHTML = `<div style="font-size:14px;color:var(--text-secondary);text-align:center;padding:12px 0;">
-            Dad hasn't entered his flights yet this week.
+            Dad hasn't entered his flights yet.
           </div>`;
         }
       } else {
