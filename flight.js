@@ -28,6 +28,22 @@ window.Flight = (() => {
   // ── Flight data storage ───────────────────────────────────
   // Format: { outbound: {num, date} | null, return: {num, date} | null }
 
+  // Normalize any incoming data — handles both new format and old
+  // {monday, friday} string format that may still be in Firebase.
+  function normalizeFlightData(data) {
+    if (!data) return { outbound: null, return: null };
+    // Already new format (has outbound or return keys)
+    if ('outbound' in data || 'return' in data) return data;
+    // Old format migration
+    if (data.monday || data.friday) {
+      return {
+        outbound: data.monday ? { num: data.monday, date: null } : null,
+        return:   data.friday ? { num: data.friday, date: null } : null,
+      };
+    }
+    return { outbound: null, return: null };
+  }
+
   function saveFlightData(outboundNum, outboundDate, returnNum, returnDate) {
     const data = {
       outbound: outboundNum ? { num: outboundNum.trim().toUpperCase(), date: outboundDate || todayISO() } : null,
@@ -42,15 +58,7 @@ window.Flight = (() => {
     try {
       const raw = localStorage.getItem(getStorageKey());
       if (!raw) return { outbound: null, return: null };
-      const parsed = JSON.parse(raw);
-      // Migrate old format { monday: 'AA704', friday: 'WN123' }
-      if (typeof parsed.monday === 'string' || typeof parsed.friday === 'string') {
-        return {
-          outbound: parsed.monday ? { num: parsed.monday, date: null } : null,
-          return:   parsed.friday ? { num: parsed.friday, date: null } : null,
-        };
-      }
-      return parsed;
+      return normalizeFlightData(JSON.parse(raw));
     } catch { return { outbound: null, return: null }; }
   }
 
@@ -343,7 +351,8 @@ window.Flight = (() => {
   }
 
   // ── Show all saved flights ────────────────────────────────
-  function autoTrackSavedFlights(flightData) {
+  function autoTrackSavedFlights(rawData) {
+    const flightData = normalizeFlightData(rawData);
     const area = document.getElementById('flight-status-area');
     if (!area) return;
 
@@ -431,13 +440,14 @@ window.Flight = (() => {
     if (window.Sync) {
       Sync.subscribe('flights/' + weekKey, (data) => {
         if (!data) { clearFlightUI(); return; }
-        localStorage.setItem(getStorageKey(), JSON.stringify(data));
-        if (outNumEl  && data.outbound?.num)  outNumEl.value  = data.outbound.num;
-        if (outDateEl && data.outbound?.date) outDateEl.value = data.outbound.date;
-        if (retNumEl  && data.return?.num)    retNumEl.value  = data.return.num;
-        if (retDateEl && data.return?.date)   retDateEl.value = data.return.date;
+        const normalized = normalizeFlightData(data);
+        localStorage.setItem(getStorageKey(), JSON.stringify(normalized));
+        if (outNumEl  && normalized.outbound?.num)  outNumEl.value  = normalized.outbound.num;
+        if (outDateEl && normalized.outbound?.date) outDateEl.value = normalized.outbound.date;
+        if (retNumEl  && normalized.return?.num)    retNumEl.value  = normalized.return.num;
+        if (retDateEl && normalized.return?.date)   retDateEl.value = normalized.return.date;
         if (window.Tracker) Tracker.applyDadMode();
-        autoTrackSavedFlights(data);
+        autoTrackSavedFlights(normalized);
       });
     }
 
