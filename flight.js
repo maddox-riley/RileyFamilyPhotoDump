@@ -40,9 +40,25 @@ window.Flight = (() => {
     } catch { return { monday: '', friday: '' }; }
   }
 
+  // ── Local flight data cache (Dad's device) ───────────────
+  // Persists the last-fetched flight object so it can be re-pushed
+  // to Firebase next time the app opens, without waiting for a Save.
+
+  function saveFdCache(flightNumber, flight) {
+    try { localStorage.setItem(`riley_fdc_${flightNumber}`, JSON.stringify(flight)); } catch {}
+  }
+
+  function loadFdCache(flightNumber) {
+    try {
+      const raw = localStorage.getItem(`riley_fdc_${flightNumber}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  }
+
   // ── Push fetched data to Firebase (for family devices) ───
   function pushFlightToFirebase(flightNumber, flight) {
     if (!window.Sync || !Sync.isConfigured()) return;
+    saveFdCache(flightNumber, flight); // keep a local copy for startup re-push
     Sync.set(fbDataPath(flightNumber), flight);
   }
 
@@ -396,6 +412,16 @@ window.Flight = (() => {
 
     if (monInput && saved.monday) monInput.value = saved.monday;
     if (friInput && saved.friday) friInput.value = saved.friday;
+
+    // Re-push last known flight data to Firebase on every startup (Dad's device only).
+    // Without this, family devices only see data after Dad explicitly clicks Save.
+    // With this, opening the app on Dad's device is enough to refresh Firebase.
+    if (hasApiKey()) {
+      [saved.monday, saved.friday].filter(Boolean).forEach(num => {
+        const cached = loadFdCache(num);
+        if (cached) pushFlightToFirebase(num, cached);
+      });
+    }
 
     // Subscribe to flight number changes (cross-device).
     // When Dad saves a flight on one device it instantly appears everywhere.
