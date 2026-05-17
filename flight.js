@@ -1,18 +1,15 @@
 // ============================================================
 // Riley Family — Flight Module
-// AeroDataBox via RapidAPI — tracks any flight on any day.
+// AeroDataBox via RapidAPI — tracks any flight by number.
 //
-// Two slots: Departure and Return. Each stores a flight number
-// and a date so the API query targets the right day.
-//
-// Only Dad's device needs the RapidAPI key. After every fetch
-// the normalized result is pushed to Firebase so all family
-// devices see live status without their own key.
+// Two slots: Departure and Return. Enter any flight number.
+// Dad's device (with RapidAPI key) fetches live data and pushes
+// it to Firebase. All family devices read from Firebase.
 // ============================================================
 
 window.Flight = (() => {
 
-  const LS_KEY    = 'riley_flights2_'; // version 2 key avoids old format collision
+  const LS_KEY = 'riley_flights2_';
   let refreshTimers = {};
 
   // ── Helpers ───────────────────────────────────────────────
@@ -25,29 +22,26 @@ window.Flight = (() => {
     return !!(CONFIG.RAPIDAPI_KEY && CONFIG.RAPIDAPI_KEY !== 'YOUR_RAPIDAPI_KEY_HERE');
   }
 
-  // ── Flight data storage ───────────────────────────────────
-  // Format: { outbound: {num, date} | null, return: {num, date} | null }
-
-  // Normalize any incoming data — handles both new format and old
-  // {monday, friday} string format that may still be in Firebase.
+  // ── Normalize any stored format → {outbound, return} ─────
+  // Handles old {monday, friday} format from Firebase during transition.
   function normalizeFlightData(data) {
     if (!data) return { outbound: null, return: null };
-    // Already new format (has outbound or return keys)
     if ('outbound' in data || 'return' in data) return data;
-    // Old format migration
+    // Old format
     if (data.monday || data.friday) {
       return {
-        outbound: data.monday ? { num: data.monday, date: null } : null,
-        return:   data.friday ? { num: data.friday, date: null } : null,
+        outbound: data.monday ? { num: data.monday } : null,
+        return:   data.friday ? { num: data.friday } : null,
       };
     }
     return { outbound: null, return: null };
   }
 
-  function saveFlightData(outboundNum, outboundDate, returnNum, returnDate) {
+  // ── Storage ───────────────────────────────────────────────
+  function saveFlightData(outboundNum, returnNum) {
     const data = {
-      outbound: outboundNum ? { num: outboundNum.trim().toUpperCase(), date: outboundDate || todayISO() } : null,
-      return:   returnNum   ? { num: returnNum.trim().toUpperCase(),   date: returnDate   || todayISO() } : null,
+      outbound: outboundNum ? { num: outboundNum.trim().toUpperCase() } : null,
+      return:   returnNum   ? { num: returnNum.trim().toUpperCase() }   : null,
     };
     localStorage.setItem(getStorageKey(), JSON.stringify(data));
     if (window.Sync) Sync.set('flights/' + getWeekKey(), data);
@@ -57,23 +51,22 @@ window.Flight = (() => {
   function loadFlightData() {
     try {
       const raw = localStorage.getItem(getStorageKey());
-      if (!raw) return { outbound: null, return: null };
-      return normalizeFlightData(JSON.parse(raw));
+      return raw ? normalizeFlightData(JSON.parse(raw)) : { outbound: null, return: null };
     } catch { return { outbound: null, return: null }; }
   }
 
-  // Keep loadFlightNumbers as an alias used by tracker.js
+  // Alias for tracker.js compatibility
   function loadFlightNumbers() {
     const d = loadFlightData();
     return {
-      monday: d.outbound?.num || '',
-      friday: d.return?.num   || '',
       outbound: d.outbound,
       return:   d.return,
+      monday:   d.outbound?.num || '',
+      friday:   d.return?.num   || '',
     };
   }
 
-  // ── Local flight data cache (Dad's device) ───────────────
+  // ── Local cache (Dad's device) — re-pushed on startup ────
   function saveFdCache(num, flight) {
     try { localStorage.setItem(`riley_fdc_${num}`, JSON.stringify(flight)); } catch {}
   }
@@ -88,12 +81,10 @@ window.Flight = (() => {
     Sync.set(fbDataPath(num), flight);
   }
 
-  // ── API fetch ─────────────────────────────────────────────
-  async function fetchFlightData(flightNumber, date) {
-    if (!hasApiKey()) throw new Error('RapidAPI key not configured.');
-    const queryDate = date || todayISO();
-    const url = `https://aerodatabox.p.rapidapi.com/flights/number/${encodeURIComponent(flightNumber)}/${queryDate}`;
-
+  // ── API fetch (always today's date) ───────────────────────
+  async function fetchFlightData(flightNumber) {
+    if (!hasApiKey()) throw new Error('no_key');
+    const url = `https://aerodatabox.p.rapidapi.com/flights/number/${encodeURIComponent(flightNumber)}/${todayISO()}`;
     const resp = await fetch(url, {
       method: 'GET',
       headers: {
@@ -101,13 +92,11 @@ window.Flight = (() => {
         'X-RapidAPI-Host': CONFIG.AERODATABOX_HOST,
       },
     });
-
-    if (resp.status === 404) throw new Error(`No flight found for ${flightNumber} on ${queryDate}.`);
+    if (resp.status === 404) throw new Error(`${flightNumber} not found for today.`);
     if (!resp.ok) {
       const txt = await resp.text().catch(() => '');
       throw new Error(`API error ${resp.status}${txt ? ': ' + txt : ''}`);
     }
-
     const data   = await resp.json();
     const flight = Array.isArray(data) ? data[0] : data;
     if (!flight) throw new Error('No flight data returned.');
@@ -122,7 +111,6 @@ window.Flight = (() => {
     const arr    = raw.arrival   || {};
     const airline = raw.airline  || {};
     const status = (raw.status || 'Unknown').toLowerCase();
-
     return {
       flightNumber:     raw.number || flightNumber,
       airline:          airline.name || '',
@@ -146,11 +134,11 @@ window.Flight = (() => {
   }
 
   function mapStatus(s) {
-    if (s.includes('cancel'))                                           return 'cancelled';
-    if (s.includes('land') || s.includes('arrived'))                   return 'landed';
-    if (s.includes('air') || s.includes('en route') || s.includes('departed')) return 'in-air';
-    if (s.includes('board'))                                           return 'boarding';
-    if (s.includes('delay'))                                           return 'delayed';
+    if (s.includes('cancel'))                                                    return 'cancelled';
+    if (s.includes('land') || s.includes('arrived'))                             return 'landed';
+    if (s.includes('air') || s.includes('en route') || s.includes('departed'))  return 'in-air';
+    if (s.includes('board'))                                                     return 'boarding';
+    if (s.includes('delay'))                                                     return 'delayed';
     return 'scheduled';
   }
 
@@ -158,82 +146,67 @@ window.Flight = (() => {
     const dep = raw.departure?.scheduledTime?.utc;
     const arr = raw.arrival?.scheduledTime?.utc;
     if (!dep || !arr) return 0.5;
-    const now = Date.now(), depMs = new Date(dep).getTime(), arrMs = new Date(arr).getTime();
-    if (now <= depMs) return 0;
-    if (now >= arrMs) return 1;
-    return (now - depMs) / (arrMs - depMs);
+    const now = Date.now(), d = new Date(dep).getTime(), a = new Date(arr).getTime();
+    return now <= d ? 0 : now >= a ? 1 : (now - d) / (a - d);
   }
 
   // ── Format helpers ────────────────────────────────────────
-  function formatTime(iso) {
+  function fmt(iso) {
     if (!iso) return '--:--';
     try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true }); }
     catch { return '--:--'; }
   }
-
-  function getDelay(scheduled, actual) {
-    if (!scheduled || !actual) return 0;
-    return Math.round((new Date(actual) - new Date(scheduled)) / 60000);
-  }
-
-  function formatCountdown(targetISO) {
-    if (!targetISO) return '';
-    const diff = new Date(targetISO) - Date.now();
-    if (diff <= 0) return 'Now';
-    const h = Math.floor(diff / 3600000), m = Math.floor((diff % 3600000) / 60000);
+  function delay(s, a) { return (!s || !a) ? 0 : Math.round((new Date(a) - new Date(s)) / 60000); }
+  function countdown(iso) {
+    if (!iso) return '';
+    const d = new Date(iso) - Date.now();
+    if (d <= 0) return 'Now';
+    const h = Math.floor(d / 3600000), m = Math.floor((d % 3600000) / 60000);
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
-  }
-
-  function formatDate(isoDate) {
-    if (!isoDate) return '';
-    try {
-      return new Date(isoDate + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    } catch { return isoDate; }
   }
 
   // ── Render flight card ────────────────────────────────────
   function renderFlightCard(flight, label) {
     const depTime  = flight.actualDep || flight.scheduledDep;
     const arrTime  = flight.actualArr || flight.scheduledArr;
-    const depDelay = getDelay(flight.scheduledDep, flight.actualDep);
-    const arrDelay = getDelay(flight.scheduledArr, flight.actualArr);
+    const depDelay = delay(flight.scheduledDep, flight.actualDep);
+    const arrDelay = delay(flight.scheduledArr, flight.actualArr);
     const isInAir  = flight.status === 'in-air';
-    const progress = flight.progress || 0;
-    const planePos = Math.max(5, Math.min(95, progress * 100));
+    const prog     = Math.max(5, Math.min(95, (flight.progress || 0) * 100));
 
     const statusLabel = {
-      'scheduled': 'Scheduled', 'boarding': 'Boarding',
-      'in-air':    'In Air ✈️', 'landed':   'Landed ✅',
-      'delayed':   'Delayed ⚠️', 'cancelled': 'Cancelled ❌',
+      scheduled: 'Scheduled', boarding: 'Boarding',
+      'in-air':  'In Air ✈️', landed:   'Landed ✅',
+      delayed:   'Delayed ⚠️', cancelled: 'Cancelled ❌',
     }[flight.status] || flight.rawStatus;
 
     let alertHtml = '';
     if (flight.status === 'cancelled') {
-      alertHtml = `<div class="cancel-alert">⛔ Flight ${flight.flightNumber} has been CANCELLED</div>`;
+      alertHtml = `<div class="cancel-alert">⛔ ${flight.flightNumber} has been CANCELLED</div>`;
     } else if (depDelay >= 15 || arrDelay >= 15) {
-      alertHtml = `<div class="delay-alert">⚠️ Delayed by approximately ${Math.max(depDelay, arrDelay)} minutes</div>`;
+      alertHtml = `<div class="delay-alert">⚠️ Delayed approximately ${Math.max(depDelay, arrDelay)} minutes</div>`;
     }
 
-    let countdownHtml = '';
+    let cdHtml = '';
     if (flight.status === 'scheduled' || flight.status === 'delayed') {
-      const cd = formatCountdown(depTime);
-      if (cd) countdownHtml = `<div style="padding:10px 18px;font-size:13px;color:var(--text-secondary);">🕐 Departs in <strong>${cd}</strong>${flight.depGate ? ` · Gate ${flight.depGate}` : ''}</div>`;
+      const cd = countdown(depTime);
+      if (cd) cdHtml = `<div style="padding:10px 18px;font-size:13px;color:var(--text-secondary);">🕐 Departs in <strong>${cd}</strong>${flight.depGate ? ` · Gate ${flight.depGate}` : ''}</div>`;
     } else if (flight.status === 'boarding') {
-      countdownHtml = `<div style="padding:10px 18px;font-size:13px;color:var(--orange);font-weight:700;">🚶 Now Boarding${flight.depGate ? ` · Gate ${flight.depGate}` : ''}</div>`;
+      cdHtml = `<div style="padding:10px 18px;font-size:13px;color:var(--orange);font-weight:700;">🚶 Now Boarding${flight.depGate ? ` · Gate ${flight.depGate}` : ''}</div>`;
     } else if (flight.status === 'in-air') {
-      const cd = formatCountdown(arrTime);
-      if (cd) countdownHtml = `<div style="padding:10px 18px;font-size:13px;color:var(--green);font-weight:600;">✈️ Arrives in <strong>${cd}</strong></div>`;
+      const cd = countdown(arrTime);
+      if (cd) cdHtml = `<div style="padding:10px 18px;font-size:13px;color:var(--green);font-weight:600;">✈️ Arrives in <strong>${cd}</strong></div>`;
     } else if (flight.status === 'landed') {
-      countdownHtml = `<div style="padding:10px 18px;font-size:13px;color:var(--green);font-weight:700;">✅ Landed — ${flight.airline || 'Flight'} has arrived!</div>`;
+      cdHtml = `<div style="padding:10px 18px;font-size:13px;color:var(--green);font-weight:700;">✅ Landed — ${flight.airline || 'Flight'} has arrived!</div>`;
     }
 
-    const arcSvg = `
+    const arc = `
       <svg viewBox="0 0 160 50" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:160px;overflow:visible;">
         <path class="flight-path-line" d="M 10,40 Q 80,2 150,40"/>
-        ${isInAir ? `
-          <circle cx="${10 + (planePos/100)*140}" cy="${40 - Math.sin((planePos/100)*Math.PI)*38+2}" r="4" fill="var(--blue)" opacity="0.7"/>
-          <text x="${10 + (planePos/100)*140}" y="${40 - Math.sin((planePos/100)*Math.PI)*38-6}" font-size="14" text-anchor="middle">✈️</text>
-        ` : `<text x="80" y="20" font-size="14" text-anchor="middle">✈️</text>`}
+        ${isInAir
+          ? `<circle cx="${10+(prog/100)*140}" cy="${40-Math.sin((prog/100)*Math.PI)*38+2}" r="4" fill="var(--blue)" opacity="0.7"/>
+             <text x="${10+(prog/100)*140}" y="${40-Math.sin((prog/100)*Math.PI)*38-6}" font-size="14" text-anchor="middle">✈️</text>`
+          : `<text x="80" y="20" font-size="14" text-anchor="middle">✈️</text>`}
       </svg>`;
 
     return `
@@ -251,18 +224,18 @@ window.Flight = (() => {
           <div class="route-airport">
             <div class="airport-code">${flight.departureAirport}</div>
             <div class="airport-city">${flight.departureCity}</div>
-            <div class="airport-time${depDelay >= 15 ? ' delayed' : ''}">${formatTime(flight.scheduledDep)}</div>
-            ${flight.actualDep && depDelay >= 5 ? `<div class="airport-time" style="font-size:13px;color:var(--red);">${formatTime(flight.actualDep)}</div>` : ''}
+            <div class="airport-time${depDelay >= 15 ? ' delayed' : ''}">${fmt(flight.scheduledDep)}</div>
+            ${flight.actualDep && depDelay >= 5 ? `<div class="airport-time" style="font-size:13px;color:var(--red);">${fmt(flight.actualDep)}</div>` : ''}
           </div>
-          <div class="route-arc">${arcSvg}</div>
+          <div class="route-arc">${arc}</div>
           <div class="route-airport">
             <div class="airport-code">${flight.arrivalAirport}</div>
             <div class="airport-city">${flight.arrivalCity}</div>
-            <div class="airport-time${arrDelay >= 15 ? ' delayed' : ''}">${formatTime(flight.scheduledArr)}</div>
-            ${flight.actualArr && arrDelay >= 5 ? `<div class="airport-time" style="font-size:13px;color:var(--red);">${formatTime(flight.actualArr)}</div>` : ''}
+            <div class="airport-time${arrDelay >= 15 ? ' delayed' : ''}">${fmt(flight.scheduledArr)}</div>
+            ${flight.actualArr && arrDelay >= 5 ? `<div class="airport-time" style="font-size:13px;color:var(--red);">${fmt(flight.actualArr)}</div>` : ''}
           </div>
         </div>
-        ${countdownHtml}
+        ${cdHtml}
         <div class="flight-details-grid">
           <div class="flight-detail-item"><div class="detail-label">Dep Gate</div><div class="detail-value">${flight.depGate || '—'}</div></div>
           <div class="flight-detail-item"><div class="detail-label">Arr Gate</div><div class="detail-value">${flight.arrGate || '—'}</div></div>
@@ -275,36 +248,36 @@ window.Flight = (() => {
       </div>`;
   }
 
-  // ── Auto-refresh (Dad's device only) ─────────────────────
-  function startAutoRefresh(key, num, date, label, containerEl) {
+  // ── Auto-refresh (Dad's device) ───────────────────────────
+  function startAutoRefresh(key, num, label, el) {
     stopAutoRefresh(key);
-    async function doRefresh() {
+    async function tick() {
       try {
-        const flight = await fetchFlightData(num, date);
-        if (containerEl.isConnected) containerEl.innerHTML = renderFlightCard(flight, label);
-        if (flight.status === 'landed') {
-          const notifKey = `riley_notif_landed_${num}`;
-          if (!sessionStorage.getItem(notifKey)) {
-            sessionStorage.setItem(notifKey, '1');
+        const f = await fetchFlightData(num);
+        if (el.isConnected) el.innerHTML = renderFlightCard(f, label);
+        if (f.status === 'landed') {
+          const k = `riley_notif_landed_${num}`;
+          if (!sessionStorage.getItem(k)) {
+            sessionStorage.setItem(k, '1');
             window.Tracker?.showInAppAlert('✈️ Landed!', `${num} has arrived!`);
           }
         }
-        if (['cancelled', 'landed'].includes(flight.status)) stopAutoRefresh(key);
-      } catch (e) { console.warn('Flight refresh error:', e); }
+        if (['cancelled', 'landed'].includes(f.status)) stopAutoRefresh(key);
+      } catch (e) { console.warn('Flight refresh:', e); }
     }
-    refreshTimers[key] = setInterval(doRefresh, 60000);
+    refreshTimers[key] = setInterval(tick, 60000);
   }
 
   function stopAutoRefresh(key) {
     if (refreshTimers[key]) { clearInterval(refreshTimers[key]); delete refreshTimers[key]; }
   }
 
-  // ── Track a single flight slot ────────────────────────────
-  async function trackFlight(num, date, label, containerEl) {
+  // ── Track one flight slot ─────────────────────────────────
+  async function trackFlight(num, label, containerEl) {
     if (!num) return;
     const path = fbDataPath(num);
 
-    // Subscribe so the card live-updates whenever Dad's device refreshes
+    // Subscribe so the card updates live when Dad's device pushes new data
     if (window.Sync && Sync.isConfigured()) {
       Sync.subscribe(path, (data) => {
         if (data && containerEl.isConnected) containerEl.innerHTML = renderFlightCard(data, label);
@@ -312,101 +285,103 @@ window.Flight = (() => {
     }
 
     if (hasApiKey()) {
+      // Dad's device: fetch from API
       containerEl.innerHTML = `
         <div style="display:flex;align-items:center;gap:12px;padding:16px;color:var(--text-secondary);">
           <span class="spinner"></span><span>Fetching ${num}…</span>
         </div>`;
       try {
-        const flight = await fetchFlightData(num, date);
-        if (containerEl.isConnected) containerEl.innerHTML = renderFlightCard(flight, label);
-        if (['scheduled', 'boarding', 'in-air', 'delayed'].includes(flight.status)) {
-          startAutoRefresh(`${num}_${label}`, num, date, label, containerEl);
+        const f = await fetchFlightData(num);
+        if (containerEl.isConnected) containerEl.innerHTML = renderFlightCard(f, label);
+        if (['scheduled', 'boarding', 'in-air', 'delayed'].includes(f.status)) {
+          startAutoRefresh(`${num}_${label}`, num, label, containerEl);
           const ind = document.getElementById('flight-refresh-indicator');
-          if (ind) ind.textContent = 'Auto-refreshing every 60s';
+          if (ind) ind.textContent = 'Live · updates every 60s';
         }
       } catch (e) {
-        if (containerEl.isConnected) {
+        if (!containerEl.isConnected) return;
+        if (e.message === 'no_key') {
+          containerEl.innerHTML = `
+            <div class="error-banner">
+              <span class="error-icon">🔑</span>
+              <div><strong>RapidAPI key not configured</strong><br/>
+              <span style="font-size:13px;">Long-press "Riley Family" → Update API Keys to add your key.</span></div>
+            </div>`;
+        } else {
           containerEl.innerHTML = `
             <div class="error-banner">
               <span class="error-icon">⚠️</span>
-              <div><strong>Could not fetch flight data</strong><br/>
+              <div><strong>Could not fetch ${num}</strong><br/>
               <span style="font-size:13px;">${e.message}</span></div>
             </div>`;
         }
       }
     } else {
-      // Family device: read from Firebase
+      // Family device: read from Firebase; subscribe handles live updates
       let cached = null;
       if (window.Sync && Sync.isConfigured()) cached = await Sync.get(path);
       if (cached) {
         if (containerEl.isConnected) containerEl.innerHTML = renderFlightCard(cached, label);
       } else if (containerEl.isConnected) {
-        const dateStr = date ? ` · ${formatDate(date)}` : '';
         containerEl.innerHTML = `
           <div style="font-size:14px;color:var(--text-secondary);text-align:center;padding:16px 0;">
-            ✈️ <strong>${num}</strong>${dateStr} — tracking data loading…
+            ✈️ Waiting for live data on <strong>${num}</strong>…
           </div>`;
       }
     }
   }
 
-  // ── Show all saved flights ────────────────────────────────
-  function autoTrackSavedFlights(rawData) {
-    const flightData = normalizeFlightData(rawData);
+  // ── Render all saved flight slots ─────────────────────────
+  function renderAllFlights(rawData) {
     const area = document.getElementById('flight-status-area');
     if (!area) return;
 
+    const data  = normalizeFlightData(rawData);
     const slots = [
-      flightData?.outbound ? { ...flightData.outbound, label: 'Departure' }   : null,
-      flightData?.return   ? { ...flightData.return,   label: 'Return Flight' } : null,
+      data?.outbound?.num ? { num: data.outbound.num, label: 'Departure'     } : null,
+      data?.return?.num   ? { num: data.return.num,   label: 'Return Flight' } : null,
     ].filter(Boolean);
 
-    if (slots.length === 0) return;
+    if (slots.length === 0) { area.innerHTML = ''; return; }
 
-    // Build a container for each slot
-    area.innerHTML = slots.map((_, i) =>
-      `<div id="flight-slot-${i}" style="${i > 0 ? 'margin-top:12px;' : ''}"></div>`
+    // Build a stable container per slot keyed by flight number so async
+    // fetches always write into the correct (connected) element.
+    area.innerHTML = slots.map(s =>
+      `<div id="fslot-${s.num}" style="margin-top:${slots.indexOf(s) > 0 ? '12px' : '0'}"></div>`
     ).join('');
 
-    slots.forEach((slot, i) => {
-      const el = document.getElementById(`flight-slot-${i}`);
-      if (el) trackFlight(slot.num, slot.date, slot.label, el);
+    slots.forEach(s => {
+      const el = document.getElementById(`fslot-${s.num}`);
+      if (el) trackFlight(s.num, s.label, el);
     });
   }
 
-  // ── Clear flight UI on this device ───────────────────────
+  // ── Clear flight UI ───────────────────────────────────────
   function clearFlightUI() {
-    const outEl  = document.getElementById('outbound-flight-input');
-    const outDt  = document.getElementById('outbound-flight-date');
-    const retEl  = document.getElementById('return-flight-input');
-    const retDt  = document.getElementById('return-flight-date');
-    const area   = document.getElementById('flight-status-area');
-    const fv     = document.getElementById('dad-flight-family-view');
-    const ind    = document.getElementById('flight-refresh-indicator');
-
-    if (outEl) outEl.value = '';
-    if (outDt) outDt.value = '';
-    if (retEl) retEl.value = '';
-    if (retDt) retDt.value = '';
-    if (area)  area.innerHTML = '';
-    if (fv)    fv.innerHTML   = '';
-    if (ind)   ind.textContent = '';
+    ['outbound-flight-input', 'return-flight-input'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    const area = document.getElementById('flight-status-area');
+    const fv   = document.getElementById('dad-flight-family-view');
+    const ind  = document.getElementById('flight-refresh-indicator');
+    if (area) area.innerHTML = '';
+    if (fv)   fv.innerHTML   = '';
+    if (ind)  ind.textContent = '';
   }
 
-  // ── Clear all flight tracking (dev tool) ──────────────────
+  // ── Clear all tracking (dev tool) ─────────────────────────
   async function clearFlightTracking() {
-    const weekKey = getWeekKey();
-    const saved   = loadFlightData();
-
-    Object.keys(refreshTimers).forEach(k => stopAutoRefresh(k));
+    const wk    = getWeekKey();
+    const saved = loadFlightData();
+    Object.keys(refreshTimers).forEach(stopAutoRefresh);
     localStorage.removeItem(getStorageKey());
-    [saved.outbound?.num, saved.return?.num].filter(Boolean).forEach(num => {
-      localStorage.removeItem(`riley_fdc_${num}`);
+    [saved.outbound?.num, saved.return?.num].filter(Boolean).forEach(n => {
+      localStorage.removeItem(`riley_fdc_${n}`);
     });
-
     if (window.Sync && Sync.isConfigured()) {
-      await Sync.remove(`flightData/${weekKey}`);
-      await Sync.remove(`flights/${weekKey}`);
+      await Sync.remove(`flightData/${wk}`);
+      await Sync.remove(`flights/${wk}`);
     }
     clearFlightUI();
   }
@@ -415,20 +390,14 @@ window.Flight = (() => {
   function init() {
     const saved   = loadFlightData();
     const weekKey = getWeekKey();
-    const today   = todayISO();
-
-    const outNumEl  = document.getElementById('outbound-flight-input');
-    const outDateEl = document.getElementById('outbound-flight-date');
-    const retNumEl  = document.getElementById('return-flight-input');
-    const retDateEl = document.getElementById('return-flight-date');
 
     // Populate inputs
-    if (outNumEl  && saved.outbound?.num)  outNumEl.value  = saved.outbound.num;
-    if (outDateEl) outDateEl.value = saved.outbound?.date || today;
-    if (retNumEl  && saved.return?.num)    retNumEl.value  = saved.return.num;
-    if (retDateEl) retDateEl.value = saved.return?.date   || today;
+    const outEl = document.getElementById('outbound-flight-input');
+    const retEl = document.getElementById('return-flight-input');
+    if (outEl && saved.outbound?.num) outEl.value = saved.outbound.num;
+    if (retEl && saved.return?.num)   retEl.value = saved.return.num;
 
-    // On Dad's device: re-push last known data to Firebase on startup
+    // Re-push last-known flight data to Firebase on startup (Dad's device only)
     if (hasApiKey()) {
       [saved.outbound?.num, saved.return?.num].filter(Boolean).forEach(num => {
         const cached = loadFdCache(num);
@@ -436,44 +405,39 @@ window.Flight = (() => {
       });
     }
 
-    // Subscribe to flight data changes (cross-device)
+    // Subscribe to flight number changes — fires immediately with current value
+    // and again whenever Dad saves a new number on any device.
     if (window.Sync) {
       Sync.subscribe('flights/' + weekKey, (data) => {
         if (!data) { clearFlightUI(); return; }
-        const normalized = normalizeFlightData(data);
-        localStorage.setItem(getStorageKey(), JSON.stringify(normalized));
-        if (outNumEl  && normalized.outbound?.num)  outNumEl.value  = normalized.outbound.num;
-        if (outDateEl && normalized.outbound?.date) outDateEl.value = normalized.outbound.date;
-        if (retNumEl  && normalized.return?.num)    retNumEl.value  = normalized.return.num;
-        if (retDateEl && normalized.return?.date)   retDateEl.value = normalized.return.date;
+        const norm = normalizeFlightData(data);
+        localStorage.setItem(getStorageKey(), JSON.stringify(norm));
+        if (outEl && norm.outbound?.num) outEl.value = norm.outbound.num;
+        if (retEl && norm.return?.num)   retEl.value = norm.return.num;
         if (window.Tracker) Tracker.applyDadMode();
-        autoTrackSavedFlights(normalized);
+        renderAllFlights(norm);
       });
+    } else {
+      // No Firebase — render from local data
+      renderAllFlights(saved);
     }
 
-    // Wire Save buttons
+    // Wire Track buttons
     document.getElementById('track-outbound-btn')?.addEventListener('click', () => {
-      const num  = outNumEl?.value?.trim().toUpperCase();
-      const date = outDateEl?.value || today;
+      const num = outEl?.value?.trim().toUpperCase();
       if (!num) return;
-      const current = loadFlightData();
-      const updated = saveFlightData(num, date, current.return?.num || '', current.return?.date || '');
-      const area = document.getElementById('flight-status-area');
-      if (area) autoTrackSavedFlights(updated);
+      const cur     = loadFlightData();
+      const updated = saveFlightData(num, cur.return?.num || '');
+      renderAllFlights(updated);
     });
 
     document.getElementById('track-return-btn')?.addEventListener('click', () => {
-      const num  = retNumEl?.value?.trim().toUpperCase();
-      const date = retDateEl?.value || today;
+      const num = retEl?.value?.trim().toUpperCase();
       if (!num) return;
-      const current = loadFlightData();
-      const updated = saveFlightData(current.outbound?.num || '', current.outbound?.date || '', num, date);
-      const area = document.getElementById('flight-status-area');
-      if (area) autoTrackSavedFlights(updated);
+      const cur     = loadFlightData();
+      const updated = saveFlightData(cur.outbound?.num || '', num);
+      renderAllFlights(updated);
     });
-
-    // Auto-show on load for all devices and profiles
-    autoTrackSavedFlights(saved);
   }
 
   // ── Public API ────────────────────────────────────────────
