@@ -95,6 +95,10 @@ window.Dump = (() => {
   let mediaViewerItemIdx  = 0;
   let myUploadsVisuals    = [];
 
+  // Auto-clear state (media clears 24 h after reveal is first opened)
+  let autoClearTimeout           = null;
+  let revealOpenedMarkedForWeek  = null; // prevents re-marking within the same session
+
   // ── Timing helpers ────────────────────────────────────────
   function canUpload() {
     const now = new Date();
@@ -600,6 +604,9 @@ window.Dump = (() => {
 
     // Fade overlay in
     requestAnimationFrame(() => overlay.classList.add('visible'));
+
+    // Record first-open timestamp so all devices auto-clear 24 h later
+    markRevealOpened(weekKey);
   }
 
   function buildRevealCards(weekKey, allMedia, grouped) {
@@ -1101,6 +1108,13 @@ window.Dump = (() => {
         localStorage.setItem(processedKey, String(data.clearedAt));
         await clearWeekMediaLocal(data.weekKey);
       });
+
+      // Subscribe to reveal-opened timestamp → schedules 24 h auto-clear on every device.
+      // Firebase fires the callback immediately with the current value on subscribe,
+      // so this also catches the case where the device was offline when the reveal opened.
+      Sync.subscribe('config/revealOpenedAt', (data) => {
+        scheduleAutoClear(data);
+      });
     }
 
     await refreshDumpUI();
@@ -1176,9 +1190,10 @@ window.Dump = (() => {
     await refreshHomeStats();
   }
 
-  // Clear media on ALL devices by writing a signal to Firebase
-  async function clearWeekMedia() {
-    const weekKey = App.getWeekKey();
+  // Clear media on ALL devices by writing a signal to Firebase.
+  // Pass weekKeyOverride to clear a specific week (e.g. from auto-clear after 24 h).
+  async function clearWeekMedia(weekKeyOverride) {
+    const weekKey = weekKeyOverride || App.getWeekKey();
     await clearWeekMediaLocal(weekKey);
     // Signal all other devices to clear too
     if (window.Sync && Sync.isConfigured()) {
@@ -1186,6 +1201,68 @@ window.Dump = (() => {
     }
     // Also clear AI summary cache for this week
     if (window.AI) AI.clearWeekCache(weekKey);
+  }
+
+  // ── Auto-clear: media deletes itself 24 h after reveal first opens ──
+
+  // Called by startReveal(). Writes a first-open timestamp to Firebase once
+  // per week so every device can schedule its own 24 h countdown.
+  async function markRevealOpened(weekKey) {
+    if (revealOpenedMarkedForWeek === weekKey) return; // already handled this session
+    revealOpenedMarkedForWeek = weekKey;
+
+    if (!window.Sync || !Sync.isConfigured()) return;
+    try {
+      // Only write if this week hasn't been marked yet — first device wins
+      const existing = await Sync.get('config/revealOpenedAt');
+      if (existing && existing.weekKey === weekKey) return;
+      await Sync.set('config/revealOpenedAt', { weekKey, openedAt: Date.now() });
+    } catch (e) {
+      console.warn('markRevealOpened failed:', e);
+    }
+  }
+
+  // Called by the revealOpenedAt subscription (fires immediately on subscribe +
+  // on every update). Schedules or fires the clear at the right moment.
+  function scheduleAutoClear(data) {
+    if (!data || !data.weekKey || !data.openedAt) return;
+
+    // Only act on the reveal week that matches the current dump week
+    if (data.weekKey !== App.getWeekKey()) return;
+
+    // Skip if already cleared this week on this device
+    if (localStorage.getItem(`riley_autoClear_${data.weekKey}`)) return;
+
+    const AUTO_CLEAR_DELAY = 24 * 60 * 60 * 1000; // 24 hours
+    const elapsed   = Date.now() - data.openedAt;
+    const remaining = AUTO_CLEAR_DELAY - elapsed;
+
+    clearTimeout(autoClearTimeout);
+
+    if (remaining <= 0) {
+      handleAutoClear(data.weekKey);
+    } else {
+      const hrs = (remaining / 3600000).toFixed(1);
+      console.log(`Auto-clear scheduled in ${hrs} h`);
+      autoClearTimeout = setTimeout(() => handleAutoClear(data.weekKey), remaining);
+    }
+  }
+
+  async function handleAutoClear(weekKey) {
+    const processedKey = `riley_autoClear_${weekKey}`;
+    if (localStorage.getItem(processedKey)) return; // prevent double-fire
+    localStorage.setItem(processedKey, Date.now().toString());
+
+    console.log('Auto-clearing media — 24 h since recap opened.');
+    try {
+      await clearWeekMedia(weekKey);
+    } catch (e) {
+      console.warn('Auto-clear failed:', e);
+    }
+
+    if (window.Tracker) {
+      Tracker.showInAppAlert('Recap expired 🗑️', 'This week\'s photos have been cleared. New uploads open Monday!');
+    }
   }
 
   function forceReveal() {
