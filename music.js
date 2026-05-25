@@ -26,18 +26,38 @@ window.Music = (() => {
   let fadeInterval = null;
   let stopped = false; // guards against autoplay race condition
 
-  // ── Song selection — one per week, persisted ──────────────
+  // ── Song selection — one per week, same on every device ───
+  // Order: localStorage → Firebase → random pick (written to Firebase so all
+  // other devices get the same song when they next open the reveal).
 
-  function getSongForWeek(weekKey) {
+  async function getSongForWeek(weekKey) {
     if (!HAS_MUSIC) return null;
 
     const storageKey = LS_SONG_KEY + weekKey;
+
+    // 1. Local cache (fastest path, also covers offline)
     const stored = localStorage.getItem(storageKey);
     if (stored && MUSIC_FILES.includes(stored)) return stored;
 
-    // Pick a new random song for this week
+    // 2. Firebase — another device may have already picked this week's song
+    if (window.Sync && Sync.isConfigured()) {
+      try {
+        const remote = await Sync.get(`music/${weekKey}`);
+        if (remote && MUSIC_FILES.includes(remote)) {
+          localStorage.setItem(storageKey, remote);
+          return remote;
+        }
+      } catch (e) {
+        console.warn('Music sync read failed:', e);
+      }
+    }
+
+    // 3. Pick a new song, persist locally, push to Firebase so all devices agree
     const song = MUSIC_FILES[Math.floor(Math.random() * MUSIC_FILES.length)];
     localStorage.setItem(storageKey, song);
+    if (window.Sync && Sync.isConfigured()) {
+      Sync.set(`music/${weekKey}`, song).catch(() => {});
+    }
     return song;
   }
 
@@ -113,7 +133,7 @@ window.Music = (() => {
 
   async function startReveal(weekKey) {
     stopped = false;
-    currentSong = getSongForWeek(weekKey);
+    currentSong = await getSongForWeek(weekKey);
     if (!currentSong) return null; // No music configured
 
     createAudio(currentSong);

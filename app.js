@@ -193,8 +193,20 @@ window.App = (() => {
   function openDevModal() {
     const modal = document.getElementById('dev-modal');
     if (!modal) return;
+
     const weekStartInput = document.getElementById('dev-week-start');
     if (weekStartInput) weekStartInput.value = getWeekKey();
+
+    // Populate reveal time inputs from stored config
+    try {
+      const raw = localStorage.getItem('riley_sync_config__revealTime');
+      if (raw) {
+        const val = JSON.parse(raw);
+        if (typeof val.hour   === 'number') document.getElementById('dev-reveal-hour').value   = val.hour;
+        if (typeof val.minute === 'number') document.getElementById('dev-reveal-minute').value = String(val.minute).padStart(2, '0');
+      }
+    } catch {}
+
     modal.classList.remove('hidden');
     if (navigator.vibrate) navigator.vibrate([10, 50, 10, 50, 10]);
   }
@@ -217,12 +229,27 @@ window.App = (() => {
     document.getElementById('dev-save-schedule-btn')?.addEventListener('click', async () => {
       const weekStartVal = document.getElementById('dev-week-start')?.value;
       if (!weekStartVal) return;
+
+      // Save reveal time if provided
+      const hourRaw   = document.getElementById('dev-reveal-hour')?.value;
+      const minuteRaw = document.getElementById('dev-reveal-minute')?.value;
+      if (hourRaw !== '' && minuteRaw !== '') {
+        const hour   = Math.min(23, Math.max(0, parseInt(hourRaw,   10) || 0));
+        const minute = Math.min(59, Math.max(0, parseInt(minuteRaw, 10) || 0));
+        const timeVal = { hour, minute };
+        localStorage.setItem('riley_sync_config__revealTime', JSON.stringify(timeVal));
+        if (window.Sync && Sync.isConfigured()) {
+          Sync.set('config/revealTime', timeVal).catch(() => {});
+        }
+      }
+
       // Saving a new week start clears any force-reveal flag
       await Sync.remove('config/revealForced');
       await Sync.set('config/weekStart', weekStartVal);
       Dump.refreshScheduleUI();
       closeDevModal();
-      Tracker.showInAppAlert('Week updated', `Dump week starts ${weekStartVal} — synced to all devices.`);
+      const hourLabel = hourRaw !== '' ? ` at ${hourRaw.padStart(2,'0')}:${(minuteRaw||'00').padStart(2,'0')}` : '';
+      Tracker.showInAppAlert('Week updated', `Dump week starts ${weekStartVal}${hourLabel} — synced to all devices.`);
     });
 
     document.getElementById('dev-force-reveal-btn')?.addEventListener('click', () => {
@@ -299,6 +326,14 @@ window.App = (() => {
     // Subscribe to force-reveal flag
     Sync.subscribe('config/revealForced', (forced) => {
       if (window.Dump) Dump.refreshScheduleUI();
+    });
+
+    // Subscribe to reveal time changes
+    Sync.subscribe('config/revealTime', (timeVal) => {
+      if (timeVal && typeof timeVal.hour === 'number') {
+        localStorage.setItem('riley_sync_config__revealTime', JSON.stringify(timeVal));
+        if (window.Dump) Dump.refreshScheduleUI();
+      }
     });
 
     // First-run setup check — shows setup screen if not yet configured

@@ -142,9 +142,9 @@ window.AI = (() => {
     const videos = mediaItems.filter(m => m.type === 'video');
     const voices = mediaItems.filter(m => m.type === 'voice');
 
-    // Build vision content — up to 5 photos (Cloudinary URL preferred)
+    // Build vision content — up to 20 photos (Cloudinary URL preferred)
     const content = [];
-    const photoLimit = Math.min(photos.length, 5);
+    const photoLimit = Math.min(photos.length, 20);
     for (let i = 0; i < photoLimit; i++) {
       const imgContent = await imageContentForItem(photos[i]);
       if (imgContent) content.push(imgContent);

@@ -392,16 +392,27 @@
         </button>
       </div>
 
-      <!-- Week start date -->
+      <!-- Week start date + reveal time -->
       <div class="card" style="margin-bottom:14px;">
         <div class="card-title" style="margin-bottom:4px;">Dump Week</div>
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
-          The 7-day window starts on this date. The reveal unlocks exactly 7 days later.
+          The 7-day window starts on this date. The reveal unlocks 7 days later at the configured time.
         </p>
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
           <label style="font-size:14px;color:var(--text-secondary);flex-shrink:0;">Week starts on</label>
           <input type="date" id="dev-week-start"
-            style="flex:1;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:14px;" />
+            style="flex:1;padding:8px 12px;border-radius:var(--r-sm);border:1px solid var(--separator);background:var(--surface-2);color:var(--text-primary);font-size:14px;" />
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:10px;">
+          <label style="font-size:14px;color:var(--text-secondary);flex-shrink:0;">Reveal at</label>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <input type="number" id="dev-reveal-hour" min="0" max="23" placeholder="20"
+              style="width:58px;padding:8px 10px;border-radius:var(--r-sm);border:1px solid var(--separator);background:var(--surface-2);color:var(--text-primary);font-size:14px;text-align:center;" />
+            <span style="color:var(--text-secondary);font-weight:700;">:</span>
+            <input type="number" id="dev-reveal-minute" min="0" max="59" placeholder="00"
+              style="width:58px;padding:8px 10px;border-radius:var(--r-sm);border:1px solid var(--separator);background:var(--surface-2);color:var(--text-primary);font-size:14px;text-align:center;" />
+            <span style="color:var(--text-secondary);font-size:13px;">24h</span>
+          </div>
         </div>
         <button id="dev-save-schedule-btn" class="full-btn primary" style="margin-top:14px;">
           💾 Save &amp; Sync to All Devices
@@ -464,6 +475,18 @@
       <div class="settings-member-grid" id="settings-member-grid"></div>
       <button class="full-btn secondary" id="settings-close-btn">Cancel</button>
     </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       MEDIA VIEWER  (full-screen photo / video, above reveal)
+  ════════════════════════════════════════════════════════ -->
+  <div id="media-viewer" class="hidden" role="dialog" aria-label="Media viewer">
+    <div id="media-viewer-bg"></div>
+    <button id="media-viewer-close" aria-label="Close">✕</button>
+    <div id="media-viewer-content"></div>
+    <div id="media-viewer-counter"></div>
+    <button id="media-viewer-prev" aria-label="Previous item">‹</button>
+    <button id="media-viewer-next" aria-label="Next item">›</button>
   </div>
 
 </div><!-- end #app -->

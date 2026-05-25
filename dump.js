@@ -90,6 +90,11 @@ window.Dump = (() => {
   let recordingSeconds  = 0;
   let isRecording = false;
 
+  // Media viewer state (shared between reveal carousel and My Uploads)
+  let mediaViewerVisuals  = [];
+  let mediaViewerItemIdx  = 0;
+  let myUploadsVisuals    = [];
+
   // ── Timing helpers ────────────────────────────────────────
   function canUpload() {
     const now = new Date();
@@ -100,10 +105,23 @@ window.Dump = (() => {
   }
 
   function getRevealTime() {
-    // Reveal = weekStart date + 7 days (midnight)
     const weekStart = App.getWeekKey(); // e.g. "2026-04-28"
-    const startMs = new Date(weekStart + 'T00:00:00').getTime();
-    return startMs + 7 * 24 * 60 * 60 * 1000;
+    // Default: weekStart + 7 days at midnight
+    const revealDate = new Date(weekStart + 'T00:00:00');
+    revealDate.setDate(revealDate.getDate() + 7);
+
+    // Apply custom reveal hour / minute if set via dev modal
+    try {
+      const raw = localStorage.getItem('riley_sync_config__revealTime');
+      if (raw) {
+        const val = JSON.parse(raw);
+        if (val && typeof val.hour === 'number' && typeof val.minute === 'number') {
+          revealDate.setHours(val.hour, val.minute, 0, 0);
+        }
+      }
+    } catch {}
+
+    return revealDate.getTime();
   }
 
   function isRevealUnlocked() {
@@ -336,13 +354,19 @@ window.Dump = (() => {
     let html = '';
 
     if (photos.length > 0 || videos.length > 0) {
+      const allVisuals = [...photos, ...videos];
+      myUploadsVisuals = allVisuals;
       html += `<div class="media-grid">`;
-      [...photos, ...videos].slice(0, 9).forEach(item => {
-        const url = blobURL(item.data);
+      allVisuals.forEach((item, i) => {
+        const url = item._blobURL || (item._blobURL = blobURL(item.data));
         if (item.type === 'photo') {
-          html += `<div class="media-thumb"><img src="${url}" loading="lazy" /><span class="media-type-badge">📷</span></div>`;
+          html += `<div class="media-thumb" data-upload-idx="${i}"><img src="${url}" loading="lazy" /><span class="media-type-badge">📷</span></div>`;
         } else {
-          html += `<div class="media-thumb"><video src="${url}" muted playsinline></video><span class="media-type-badge">🎥</span></div>`;
+          html += `<div class="media-thumb" data-upload-idx="${i}">
+            <video src="${url}" muted playsinline preload="metadata"></video>
+            <span class="media-type-badge">🎥</span>
+            <div class="play-overlay-sm">▶</div>
+          </div>`;
         }
       });
       html += `</div>`;
@@ -364,6 +388,14 @@ window.Dump = (() => {
     }
 
     content.innerHTML = html;
+
+    // Wire tap-to-view on all media thumbs (photos and videos)
+    content.querySelectorAll('[data-upload-idx]').forEach(thumb => {
+      thumb.addEventListener('click', () => {
+        const idx = parseInt(thumb.dataset.uploadIdx, 10);
+        openMediaViewer(myUploadsVisuals, idx);
+      });
+    });
   }
 
   // ── Render contributors ───────────────────────────────────
@@ -437,7 +469,14 @@ window.Dump = (() => {
 
     if (statusTxt) {
       if (isRevealUnlocked()) statusTxt.textContent = 'Reveal ready • Keep uploading for next week!';
-      else statusTxt.textContent = `Uploading for Week ${weekNum} • Reveal Wednesday noon`;
+      else {
+        // Build a human-readable reveal time label
+        const revealMs = getRevealTime();
+        const revealDt = new Date(revealMs);
+        const dayName  = revealDt.toLocaleDateString('en-US', { weekday: 'short' });
+        const timePart = revealDt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        statusTxt.textContent = `Uploading for Week ${weekNum} • Reveal ${dayName} ${timePart}`;
+      }
     }
   }
 
@@ -578,7 +617,12 @@ window.Dump = (() => {
     CONFIG.APP.MEMBERS.forEach((member, idx) => {
       const items = grouped[member] || [];
       if (items.length > 0) {
-        cards.push({ type: 'member', member, items, memberIdx: idx % 4 });
+        const photos  = items.filter(m => m.type === 'photo');
+        const videos  = items.filter(m => m.type === 'video');
+        const visuals = [...photos, ...videos];
+        // Pre-create and cache blob URLs so carousel + viewer share the same URL objects
+        visuals.forEach(v => { if (!v._blobURL && v.data instanceof Blob) v._blobURL = URL.createObjectURL(v.data); });
+        cards.push({ type: 'member', member, items, memberIdx: idx % 4, visuals });
       }
     });
 
@@ -597,6 +641,24 @@ window.Dump = (() => {
       div.id = `reveal-card-${idx}`;
       div.innerHTML = buildCardHTML(card, idx);
       container.appendChild(div);
+
+      // Wire carousel interactions for member cards
+      if (card.type === 'member' && card.visuals && card.visuals.length > 0) {
+        const carousel = div.querySelector('.media-carousel');
+        if (carousel) {
+          // Prevent carousel touch from triggering card-level swipe navigation
+          carousel.addEventListener('touchstart', (e) => e.stopPropagation(), { passive: true });
+          carousel.addEventListener('touchend',   (e) => e.stopPropagation(), { passive: true });
+          carousel.addEventListener('click',      (e) => e.stopPropagation());
+        }
+        // Tap item → open media viewer
+        div.querySelectorAll('.carousel-item').forEach(item => {
+          item.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openMediaViewer(card.visuals, parseInt(item.dataset.itemidx, 10));
+          });
+        });
+      }
     });
   }
 
@@ -655,22 +717,37 @@ window.Dump = (() => {
     if (card.type === 'member') {
       const photos  = card.items.filter(m => m.type === 'photo');
       const videos  = card.items.filter(m => m.type === 'video');
-      const voices  = card.items.filter(m => m.type === 'voice');
       const emojis  = { Dad: '👨', Mom: '👩', Maddox: '👦', Dylan: '👧' };
+      const visuals = card.visuals || [...photos, ...videos];
 
-      // Build media strip HTML
+      // Build swipeable carousel showing ALL visuals
       let mediaHtml = '';
-      const visuals = [...photos, ...videos].slice(0, 6);
       if (visuals.length > 0) {
-        const thumbs = visuals.map(item => {
-          const url = blobURL(item.data);
+        const thumbs = visuals.map((item, i) => {
+          const url = item._blobURL || blobURL(item.data);
+          if (!item._blobURL) item._blobURL = url;
           if (item.type === 'photo') {
-            return `<img class="reveal-thumb" src="${url}" loading="lazy" />`;
+            return `<div class="carousel-item" data-itemidx="${i}">
+              <img class="carousel-thumb" src="${url}" loading="lazy" />
+            </div>`;
           } else {
-            return `<video class="reveal-thumb" src="${url}" muted playsinline style="object-fit:cover;"></video>`;
+            return `<div class="carousel-item" data-itemidx="${i}">
+              <video class="carousel-thumb" src="${url}" muted playsinline preload="metadata"></video>
+              <div class="play-overlay">▶</div>
+            </div>`;
           }
         }).join('');
-        mediaHtml = `<div class="reveal-media-strip">${thumbs}</div>`;
+
+        const label = [
+          photos.length > 0 ? `${photos.length} photo${photos.length !== 1 ? 's' : ''}` : '',
+          videos.length > 0 ? `${videos.length} video${videos.length !== 1 ? 's' : ''}` : '',
+        ].filter(Boolean).join(' & ');
+
+        mediaHtml = `
+          <div class="media-carousel">
+            <div class="carousel-scroll">${thumbs}</div>
+            <div class="carousel-counter">📸 ${label} · tap to view full size</div>
+          </div>`;
       }
 
       return `
@@ -801,6 +878,88 @@ window.Dump = (() => {
     overlay.classList.remove('visible');
     Music.stopReveal();
     setTimeout(() => overlay.classList.add('hidden'), 400);
+  }
+
+  // ── Media viewer (full-screen photo / video viewer) ───────
+
+  function openMediaViewer(visuals, startIdx = 0) {
+    mediaViewerVisuals = visuals;
+    mediaViewerItemIdx = startIdx;
+    renderMediaViewerItem();
+    document.getElementById('media-viewer')?.classList.remove('hidden');
+    vibrate(6);
+  }
+
+  function renderMediaViewerItem() {
+    const item = mediaViewerVisuals[mediaViewerItemIdx];
+    if (!item) return;
+
+    const content = document.getElementById('media-viewer-content');
+    const counter = document.getElementById('media-viewer-counter');
+    const prev    = document.getElementById('media-viewer-prev');
+    const next    = document.getElementById('media-viewer-next');
+
+    if (content) {
+      // Pause any previous video
+      content.querySelector('video')?.pause();
+      const url = item._blobURL || (item._blobURL = blobURL(item.data));
+      if (item.type === 'photo') {
+        content.innerHTML = `<img src="${url}" alt="Photo" />`;
+      } else {
+        content.innerHTML = `<video src="${url}" controls autoplay playsinline></video>`;
+      }
+    }
+
+    if (counter) {
+      if (mediaViewerVisuals.length > 1) {
+        counter.textContent = `${mediaViewerItemIdx + 1} / ${mediaViewerVisuals.length}`;
+        counter.style.display = '';
+      } else {
+        counter.style.display = 'none';
+      }
+    }
+
+    if (prev) prev.style.display = mediaViewerItemIdx > 0 ? '' : 'none';
+    if (next) next.style.display = mediaViewerItemIdx < mediaViewerVisuals.length - 1 ? '' : 'none';
+  }
+
+  function closeMediaViewer() {
+    const viewer = document.getElementById('media-viewer');
+    if (!viewer) return;
+    // Stop any playing video before hiding
+    viewer.querySelector('video')?.pause();
+    document.getElementById('media-viewer-content').innerHTML = '';
+    viewer.classList.add('hidden');
+  }
+
+  function wireMediaViewer() {
+    const viewer = document.getElementById('media-viewer');
+    if (!viewer) return;
+
+    document.getElementById('media-viewer-close')?.addEventListener('click', closeMediaViewer);
+    // Tap the backdrop (not the content) to close
+    viewer.addEventListener('click', (e) => {
+      if (e.target === viewer || e.target.id === 'media-viewer-bg') closeMediaViewer();
+    });
+
+    document.getElementById('media-viewer-prev')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (mediaViewerItemIdx > 0) { mediaViewerItemIdx--; renderMediaViewerItem(); vibrate(6); }
+    });
+    document.getElementById('media-viewer-next')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (mediaViewerItemIdx < mediaViewerVisuals.length - 1) { mediaViewerItemIdx++; renderMediaViewerItem(); vibrate(6); }
+    });
+
+    // Swipe left/right within the viewer
+    let tvStartX = 0;
+    viewer.addEventListener('touchstart', (e) => { tvStartX = e.touches[0].clientX; }, { passive: true });
+    viewer.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - tvStartX;
+      if (Math.abs(dx) < 40) return;
+      if (dx < 0 && mediaViewerItemIdx < mediaViewerVisuals.length - 1) { mediaViewerItemIdx++; renderMediaViewerItem(); vibrate(6); }
+      else if (dx > 0 && mediaViewerItemIdx > 0) { mediaViewerItemIdx--; renderMediaViewerItem(); vibrate(6); }
+    }, { passive: true });
   }
 
   function updateMusicUI(songFile) {
@@ -947,6 +1106,7 @@ window.Dump = (() => {
     await refreshDumpUI();
     startCountdown();
     wireRevealInteractions();
+    wireMediaViewer();
     await refreshHomeStats();
 
     // Update home card state

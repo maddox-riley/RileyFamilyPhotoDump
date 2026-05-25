@@ -2,7 +2,7 @@
 // Riley Family — Service Worker
 // ============================================================
 
-const CACHE_NAME = 'riley-family-v8';
+const CACHE_NAME = 'riley-family-v9';
 const BASE = '/RileyFamilyPhotoDump';
 const STATIC_ASSETS = [
   `${BASE}/`,
